@@ -31,7 +31,7 @@
     </div>
     <div class="drawer-side z-50">
       <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label>
-      <div class="p-5 min-h-full bg-base-100">
+      <div class="p-5 min-h-full bg-base-100 border-r border-neutral">
 
         <!-- Side bar. -->
         <h1>Coral</h1>
