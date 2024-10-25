@@ -6,15 +6,16 @@
     {user: "assistant", content: "Here's a second message as a jumpscare."},
     {user: "user", content: "wtf."},
     {user: "assistant", content: "The Mistress of the Palace of the Earth Spirits after the underground city was separated from Hell. Her ability to read minds causes various youkai and spirits to fear her, but makes her loved by the animals that normally can't be understood. With these animals as pets, she manages the ruins of the Hell of Blazing Fires where her home stands. She is also the main protagonist of Foul Detective Satori. "},
-    {user: "user", content: "sabi mo eh."}
+    {user: "user", content: "sabi mo eh."},
+    {user: "assistant", content: "The Mistress of the Palace of the Earth Spirits after the underground city was separated from Hell. Her ability to read minds causes various youkai and spirits to fear her, but makes her loved by the animals that normally can't be understood. With these animals as pets, she manages the ruins of the Hell of Blazing Fires where her home stands. She is also the main protagonist of Foul Detective Satori. "},
   ];
   // need to accept chats
 </script>
 
 <!-- Chat Box -->
-<div class="flex flex-col h-full items-center overflow-hidden">
+<div class="flex flex-col items-center overflow-hidden h-full">
 
-  <div class="flex-1 p-5 overflow-y-auto">
+  <div class="p-5 overflow-y-auto flex-1">
     {#each chats as msg}
       {#if msg.user === "assistant"}
         <div class="chat chat-start">
@@ -28,8 +29,12 @@
       {/if}
     {/each}
   </div>
+
   <div class="flex w-full items-center">
     <textarea class="textarea resize-none w-full" placeholder="Send a message..."></textarea>
-    <button class="btn h-full"><iconify-icon icon="mynaui:send" class="text-3xl"></iconify-icon></button>
+    <button class="btn h-full">
+      <iconify-icon icon="mynaui:send" class="text-3xl"></iconify-icon>
+    </button>
   </div>
+
 </div>
