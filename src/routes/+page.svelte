@@ -12,7 +12,7 @@
   ];
 </script>
 
-<div class="p-5 overflow-y-auto w-full">
+<div class="p-5 overflow-y-auto w-full h-full">
     <div class="grid xl:grid-cols-5 md:grid-cols-3 grid-cols-1 gap-5">
       {#each characters as char}
         <div class="m-auto h-48 my-7 w-full">

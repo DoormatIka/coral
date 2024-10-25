@@ -12,17 +12,9 @@
 </script>
 
 <!-- Chat Box -->
-<div class="flex flex-col w-full h-full items-center overflow-hidden">
-  <div class="w-full border-b border-neutral flex flex-row content-between">
-    <div class="flex-1 sm:hidden block">
-      <iconify-icon icon="mdi:hamburger-menu" class="p-3 text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
-    </div>
-    <a href="/" class="m-3">
-      <iconify-icon icon="weui:back-filled" class="text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
-    </a>
-  </div>
+<div class="flex flex-col h-full items-center overflow-hidden">
 
-  <div class="flex-1 w-full p-5 overflow-y-auto">
+  <div class="flex-1 p-5 overflow-y-auto">
     {#each chats as msg}
       {#if msg.user === "assistant"}
         <div class="chat chat-start">

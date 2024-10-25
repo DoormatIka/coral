@@ -13,9 +13,27 @@
 
 
 <main>
-  <div class="h-full w-full flex">
-    <div class="min-w-max border-r border-neutral overflow-y-auto sm:block hidden">
-      <div class="p-5">
+  <div class="drawer sm:drawer-open h-full flex">
+    <input id="my-drawer-2" type="checkbox" class="drawer-toggle" />
+    <div class="drawer-content flex flex-col items-center justify-center">
+
+      <div class="w-full border-b border-neutral flex flex-row content-between">
+        <label for="my-drawer-2" class="flex-1 sm:hidden block">
+          <iconify-icon icon="mdi:hamburger-menu" class="p-3 text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
+        </label>
+        <a href="/" class="m-3">
+          <iconify-icon icon="weui:back-filled" class="text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
+        </a>
+      </div>
+      <slot />
+      <!-- Page content here -->
+
+    </div>
+    <div class="drawer-side z-50">
+      <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label>
+      <div class="p-5 h-full min-w-min bg-base-100">
+
+        <!-- Side bar. -->
         <h1>Coral</h1>
         <h2 class="my-2">History</h2>
         <div class="content-center grid grid-cols-2 gap-2">
@@ -27,9 +45,8 @@
             </a>
           {/each}
         </div>
+
       </div>
     </div>
-    <!-- main -->
-    <slot />
   </div>
 </main>
