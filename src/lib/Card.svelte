@@ -13,7 +13,11 @@
       alt="Shoes" />
   </figure>
   <div class="card-body min-w-full min-h-full">
-    <h2 class="card-title">{title}</h2>
-    <p class="text-ellipsis overflow-hidden">{description}</p>
+    <div class="card-title">
+      <h2 class="truncate">{title}</h2>
+    </div>
+    <div class="text-ellipsis overflow-hidden">
+      <p>{description}</p>
+    </div>
   </div>
 </div>
