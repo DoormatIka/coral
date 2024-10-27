@@ -1,7 +1,7 @@
-
-<script>
+<script lang="ts">
   import "../app.css";
   import Avatar from "$lib/Avatar.svelte";
+  import { page } from "$app/stores";
 
   // grab avatar from http rust here.
   const avatars = [
@@ -21,9 +21,11 @@
         <label for="my-drawer-2" class="flex-1 sm:hidden block">
           <iconify-icon icon="mdi:hamburger-menu" class="p-3 text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
         </label>
-        <a href="/" class="p-3">
+        {#if $page.route.id !== "/"}
+          <a href="/" class="p-3" aria-label="Home">
           <iconify-icon icon="weui:back-filled" class="text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
-        </a>
+          </a>
+        {/if}
       </div>
       <slot />
       <!-- Page content here -->
