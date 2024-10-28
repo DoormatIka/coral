@@ -1,6 +1,7 @@
 <script lang="ts">
   import {onMount} from "svelte";
   import {fly} from "svelte/transition";
+  import {invoke} from "@tauri-apps/api/core";
 
   let c: HTMLElement;
   onMount(() => {
@@ -18,10 +19,11 @@
     {user: "assistant", content: "of the Palace of the Earth Spirits"},
   ]);
   
-  function sendMessage() {
+  async function sendMessage() {
     if (message.trim() !== "") {
       chats.push({user: "user", content: structuredClone(message)});
-      chats.push({user: "assistant", content: "Hello there~"});
+      const greetMsg: string = await invoke("greet", { name: "Alice" });
+      chats.push({user: "assistant", content: greetMsg});
       message = "";
       setTimeout(() => { c.scrollBy({top: 99999, behavior: "smooth"}) }, 100);
     }
