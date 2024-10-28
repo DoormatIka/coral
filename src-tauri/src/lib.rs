@@ -1,8 +1,9 @@
+use serde_json::json;
 use tauri::async_runtime::Mutex;
 
 use tauri::{Manager, State};
-use reqwest::{Client, Response, Error};
-use std::collections::HashMap;
+use reqwest::{Client, Error};
+use serde::{Deserialize, Serialize};
 
 #[derive(Default)]
 struct AppState {
@@ -10,6 +11,32 @@ struct AppState {
     link: String,
     http_client: Client,
 }
+
+// will need all these types when i make client-side databases.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum Person {
+    Assistant,
+    System,
+    User,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Message {
+    person: Person,
+    content: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Conversation {
+    memory_id: String,
+    log: Vec<Message>,
+    regen: bool,
+}
+
+// everything returned from commands must implement serde::Serialize
+
+
 
 #[tauri::command]
 fn change_link(link: &str, state: State<'_, Mutex<AppState>>) {
@@ -22,18 +49,36 @@ fn change_link(link: &str, state: State<'_, Mutex<AppState>>) {
 fn greet(name: &str, state: State<'_, Mutex<AppState>>) -> String {
     let mut state = state.blocking_lock();
     state.counter += 1;
+
     format!("Hello, {}! You've been greeted from Rust! Called {} times.", name, state.counter)
 }
 
 #[tauri::command]
-async fn create_ai_message(name: &str, state: State<'_, Mutex<AppState>>) -> Result<Response, Error> {
+async fn create_ai_message(conversationjson: &str, state: State<'_, Mutex<AppState>>) -> Result<String, String> {
     let state = state.lock().await;
-    // only one type for the value, which i dont want.
-    let map = HashMap::<String, String>::new();
-    let res = state.http_client.post(state.link.clone())
-        .json(&map)
+
+    let mut link = state.link.clone();
+    link.push_str("/complete");
+
+    let res = state.http_client.post(link)
+        .body(conversationjson.to_string())
+        .header("Content-Type", "application/json")
         .send()
-        .await?;
+        .await;
+    let res = match res {
+        Ok(res) => res.text().await,
+        Err(err) => {
+            println!("{}", err);
+            return Err(err.to_string());
+        }
+    };
+    let res = match res {
+        Ok(res) => res,
+        Err(err) => {
+            println!("{}", err);
+            return Err(err.to_string());
+        }
+    };
 
     Ok(res)
 }
@@ -46,7 +91,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![greet, change_link])
+        .invoke_handler(tauri::generate_handler![greet, change_link, create_ai_message])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
