@@ -3,9 +3,10 @@
   import Avatar from "$lib/Avatar.svelte";
   import { page } from "$app/stores";
   import { invoke } from "@tauri-apps/api/core";
+  import { currentSystemMessage } from "./chat";
 
   let current_link = "";
-  let current_system_message = ""; // placeholder for the real thing
+  let current_system_message = ""; // working now
 
   const avatars = [
     "https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp",
@@ -23,6 +24,10 @@
   async function changeLink() {
     await invoke("change_link", { link: current_link });
   }
+  function setSystemMessage() {
+    currentSystemMessage.set(current_system_message);
+  }
+
 </script>
 
 
@@ -80,7 +85,10 @@
             <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">X</button>
           </form>
           <h3 class="text-2xl font-bold mb-3">Set your character's system message here.</h3>
-          <textarea class="w-full textarea-bordered textarea" bind:value={current_link} placeholder="Kogasa is cute!"></textarea>
+          <textarea class="w-full textarea-bordered textarea" bind:value={current_system_message} placeholder="Kogasa is cute!"></textarea>
+          <form method="dialog">
+            <button class="bg-neutral btn p-3 w-full mt-2" onclick={setSystemMessage}>Set</button>
+          </form>
         </div>
         <form method="dialog" class="modal-backdrop">
           <button>close</button>
@@ -91,6 +99,8 @@
       <slot />
 
     </div>
+
+    <!-- Drawer -->
     <div class="drawer-side z-50">
       <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label>
       <div class="p-5 min-h-full bg-base-100 border-r border-neutral">

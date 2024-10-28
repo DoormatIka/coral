@@ -2,6 +2,11 @@
   import {onMount} from "svelte";
   import {fly} from "svelte/transition";
   import {invoke} from "@tauri-apps/api/core";
+  import {currentSystemMessage} from "../chat";
+
+  let current_system_message = '';
+  currentSystemMessage.subscribe(value => current_system_message = value);
+  console.log(current_system_message);
 
   let chatelement: HTMLElement;
   let sendbutton: HTMLButtonElement;
@@ -13,7 +18,7 @@
   });
   let message = $state("");
   const chats: { person: "system" | "user" | "assistant", content: string }[] = $state([
-    {person: "system", content: "[INST]Act like Parsee Mizuhashi from Touhou Project, very obsessive and jealous. Also keep your responses short (2 sentences at most) but detailed at the same time.[/INST]"},
+    {person: "system", content: "[INST]"+ current_system_message +"[/INST]"},
     {person: "user", content: ""},
     {person: "assistant", content: "Hello there~"},
   ]);
@@ -33,6 +38,7 @@
 
       chats.push({person: "user", content: structuredClone(message)});
       message = "";
+      setTimeout(() => { chatelement.scrollBy({top: 99999, behavior: "smooth"}) }, 100);
 
       sendbutton.disabled = true;
 
