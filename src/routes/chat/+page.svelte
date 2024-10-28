@@ -9,21 +9,25 @@
     setTimeout(() => { c.scrollBy({top: 99999, behavior: "smooth"}) }, 500);
   });
   let message = $state("");
-  const chats: { user: "user" | "assistant", content: string }[] = $state([
-    {user: "user", content: "Hello."},
-    {user: "assistant", content: "Hey there."},
-    {user: "assistant", content: "Here's a second message as a jumpscare."},
-    {user: "user", content: "wtf."},
-    {user: "assistant", content: "The Mistress of the Palace of the Earth Spirits after the underground city was separated from Hell. Her ability to read minds causes various youkai and spirits to fear her, but makes her loved by the animals that normally can't be understood. With these animals as pets, she manages the ruins of the Hell of Blazing Fires where her home stands. She is also the main protagonist of Foul Detective Satori. "},
-    {user: "user", content: "sabi mo eh."},
-    {user: "assistant", content: "of the Palace of the Earth Spirits"},
+  const chats: { person: "system" | "user" | "assistant", content: string }[] = $state([
+    {person: "system", content: "[INST]Act like Parsee Mizuhashi from Touhou Project, very obsessive and jealous. Also keep your responses short but detailed at the same time.[/INST]"},
   ]);
+  const apisend = {
+    "memory_id": "c9732cf2-c734-47cf-89f1-95a9cbd1e3b7-sato-chat",
+    "log": chats,
+    "regen": false,
+  }
   
   async function sendMessage() {
     if (message.trim() !== "") {
-      chats.push({user: "user", content: structuredClone(message)});
-      const greetMsg: string = await invoke("greet", { name: "Alice" });
-      chats.push({user: "assistant", content: greetMsg});
+      chats.push({person: "user", content: structuredClone(message)});
+      let greetMsg: string = "";
+      try {
+        greetMsg = await invoke("create_ai_message", {conversationjson: JSON.stringify(apisend)});
+      } catch (err) {
+        greetMsg = err as string;
+      }
+      chats.push({person: "assistant", content: greetMsg});
       message = "";
       setTimeout(() => { c.scrollBy({top: 99999, behavior: "smooth"}) }, 100);
     }
@@ -37,7 +41,7 @@
     {#each chats as msg, index (msg)}
       <div class="w-full" transition:fly={{ duration: 400, x: -200 }}>
 
-        {#if msg.user === "assistant"}
+        {#if msg.person === "assistant"}
           <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
           <div class="dropdown dropdown-bottom w-full">
             <div class="chat chat-start">
@@ -49,7 +53,7 @@
           </div>
         {/if}
 
-        {#if msg.user === "user"}
+        {#if msg.person === "user"}
           <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
           <div class="dropdown dropdown-bottom w-full">
             <div class="chat chat-end">
