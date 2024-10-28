@@ -57,7 +57,9 @@ fn greet(name: &str, state: State<'_, Mutex<AppState>>) -> String {
 async fn create_ai_message(conversationjson: &str, state: State<'_, Mutex<AppState>>) -> Result<String, String> {
     let state = state.lock().await;
 
-    let mut link = state.link.clone();
+    let mut link = String::new();
+    link.push_str("http://");
+    link.push_str(&state.link);
     link.push_str("/complete");
 
     let res = state.http_client.post(link)

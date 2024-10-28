@@ -3,15 +3,22 @@
   import {fly} from "svelte/transition";
   import {invoke} from "@tauri-apps/api/core";
 
-  let c: HTMLElement;
+  let chatelement: HTMLElement;
+  let sendbutton: HTMLButtonElement;
   onMount(() => {
-    c = document.getElementById("chat")!;
-    setTimeout(() => { c.scrollBy({top: 99999, behavior: "smooth"}) }, 500);
+    chatelement = document.getElementById("chat")!;
+    sendbutton = document.getElementById("sendbutton")! as HTMLButtonElement;
+
+    setTimeout(() => { chatelement.scrollBy({top: 99999, behavior: "smooth"}) }, 500);
   });
   let message = $state("");
   const chats: { person: "system" | "user" | "assistant", content: string }[] = $state([
-    {person: "system", content: "[INST]Act like Parsee Mizuhashi from Touhou Project, very obsessive and jealous. Also keep your responses short but detailed at the same time.[/INST]"},
+    {person: "system", content: "[INST]Act like Parsee Mizuhashi from Touhou Project, very obsessive and jealous. Also keep your responses short (2 sentences at most) but detailed at the same time.[/INST]"},
+    {person: "user", content: ""},
+    {person: "assistant", content: "Hello there~"},
   ]);
+  // ^^ normalize chats to only use ["system"=>"user"=>"assistant"=>"user"=>...]
+
   const apisend = {
     "memory_id": "c9732cf2-c734-47cf-89f1-95a9cbd1e3b7-sato-chat",
     "log": chats,
@@ -20,23 +27,33 @@
   
   async function sendMessage() {
     if (message.trim() !== "") {
-      chats.push({person: "user", content: structuredClone(message)});
-      let greetMsg: string = "";
-      try {
-        greetMsg = await invoke("create_ai_message", {conversationjson: JSON.stringify(apisend)});
-      } catch (err) {
-        greetMsg = err as string;
+      if (chats.length > 20) {
+        chats.splice(1, 2);
       }
-      chats.push({person: "assistant", content: greetMsg});
+
+      chats.push({person: "user", content: structuredClone(message)});
       message = "";
-      setTimeout(() => { c.scrollBy({top: 99999, behavior: "smooth"}) }, 100);
+
+      sendbutton.disabled = true;
+
+      try {
+        const rawMsg: string = await invoke("create_ai_message", {conversationjson: JSON.stringify(apisend)});
+        const msg: {message: string} = JSON.parse(rawMsg);
+        chats.push({person: "assistant", content: msg.message});
+        sendbutton.disabled = false;
+      } catch (err) {
+        chats.pop();
+        message = err as string;
+        sendbutton.disabled = false;
+      }
+
+      setTimeout(() => { chatelement.scrollBy({top: 99999, behavior: "smooth"}) }, 100);
     }
   }
 </script>
 
 <!-- Chat Box -->
 <div class="flex flex-col items-center overflow-hidden h-full">
-
   <div class="p-2 overflow-y-auto flex-1 w-full" id="chat">
     {#each chats as msg, index (msg)}
       <div class="w-full" transition:fly={{ duration: 400, x: -200 }}>
@@ -71,7 +88,7 @@
 
   <div class="flex w-full items-center">
     <textarea class="textarea resize-none w-full" placeholder="Send a message..." bind:value={message}></textarea>
-    <button class="btn h-full" onclick={sendMessage} aria-label="Send Message">
+    <button class="btn h-full" id="sendbutton" onclick={sendMessage} aria-label="Send Message">
       <iconify-icon icon="mynaui:send" class="text-3xl"></iconify-icon>
     </button>
   </div>
