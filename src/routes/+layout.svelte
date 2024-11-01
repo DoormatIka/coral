@@ -38,21 +38,21 @@
     <div class="drawer-content flex flex-col h-screen">
 
       <!-- Top -->
-      <div class="w-full border-b border-neutral flex flex-row content-between gap-3 p-3">
+      <div class="w-full border-b border-neutral flex flex-row content-between gap-3 px-3">
         <label for="my-drawer-2" class="flex-1 sm:hidden block">
-          <iconify-icon icon="mdi:hamburger-menu" class="p-3 text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
+          <iconify-icon icon="mdi:hamburger-menu" class="py-3 text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
         </label>
 
         {#if $page.route.id !== "/"}
           <a href="/" class="flex items-center px-3" aria-label="Home">
-            <iconify-icon icon="weui:back-filled" class="text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
+            <iconify-icon icon="weui:back-filled" class="text-3xl py-3" style="vertical-align: -0.125em;"></iconify-icon>
           </a>
         {:else}
           <button onclick={showSysMessageModal} aria-label="id">
             <iconify-icon icon="mdi:book" class="text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
           </button>
           <button onclick={showIPModal} aria-label="id">
-            <iconify-icon icon="mdi:ip" class="text-3xl px-3" style="vertical-align: -0.125em;"></iconify-icon>
+            <iconify-icon icon="mdi:ip" class="text-3xl py-3" style="vertical-align: -0.125em;"></iconify-icon>
           </button>
         {/if}
       </div>
@@ -117,6 +117,8 @@
             </a>
           {/each}
         </div>
+        <br>
+        <a href="/create" class="btn w-full">Create</a>
 
 
       </div>
