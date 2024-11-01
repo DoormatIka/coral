@@ -1,19 +1,19 @@
+use uuid::Uuid;
+
 use tauri::async_runtime::Mutex;
 
-use tauri::{Manager, State};
-use reqwest::{Client, Error};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use tauri::{Manager, State};
 
 use native_db::*;
 use native_model::{native_model, Model};
 use once_cell::sync::Lazy;
-use transaction::query::PrimaryScan;
 
 struct AppState {
-    counter: u32,
     link: String,
     http_client: Client,
-    db: Database<'static>,
+    char_db: Database<'static>,
 }
 
 // will need all these types when i make client-side databases.
@@ -31,29 +31,28 @@ struct Message {
     content: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Conversation {
-    memory_id: String,
-    memories: Vec<Message>,
-    log: Vec<Message>,
-    regen: bool,
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 #[native_model(id = 1, version = 1)]
 #[native_db]
 struct Character {
     #[primary_key]
-    id: u32,
+    id: String,
     name: String,
+    description: String,
     system_message: String,
-    conversation: CharacterConversation,
+    first_message: String,
+    conversations: Vec<String>, // use IDs instead.
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[native_model(id = 2, version = 1)]
+#[native_db]
 struct CharacterConversation {
+    #[primary_key]
+    id: String,
+    #[secondary_key]
+    from_char_id: String,
     memory_id: String,
-    memories: Vec<Message>,
     log: Vec<Message>,
 }
 
@@ -65,14 +64,115 @@ static MODELS: Lazy<Models> = Lazy::new(|| {
 
 // everything returned from commands must implement serde::Serialize
 
+///////////////////// CONVERSATION ///////////////////////
+
+#[tauri::command]
+fn grab_conversation(state: State<'_, Mutex<AppState>>, id: String) -> Result<CharacterConversation, String> {
+    let state = state.blocking_lock();
+    let transaction = state.char_db.r_transaction().unwrap();
+    let conversation: CharacterConversation = transaction.get().primary(id).map_err(|err| err.to_string())?.ok_or_else(|| String::from("Chat does not exist!"))?;
+
+    Ok(conversation)
+}
+
+#[tauri::command]
+fn grab_conversation_list(state: State<'_, Mutex<AppState>>, char_id: String) -> Result<Vec<CharacterConversation>, String> {
+    let state = state.blocking_lock();
+    let transaction = state.char_db.r_transaction().unwrap();
+
+    let char_list: Vec<CharacterConversation> = transaction
+        .scan()
+        .secondary::<CharacterConversation>(CharacterConversationKey::from_char_id)
+        .map_err(|err| err.to_string())?
+        .start_with(char_id)
+        .map_err(|err| err.to_string())?
+        .map(|v| v.unwrap())
+        .collect();
+
+    Ok(char_list)
+}
+
+#[tauri::command]
+async fn add_conversation(state: State<'_, Mutex<AppState>>, char_id: String) -> Result<(), String> {
+    let state = state.blocking_lock();
+    let transaction = state.char_db.rw_transaction().unwrap();
+
+    let mut log: Vec<Message> = Vec::new();
+
+    let char: Character = transaction
+        .get()
+        .primary(char_id.clone())
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| String::from(""))?;
+
+    log.push(Message { person: Person::System, content: char.system_message });
+    log.push(Message { person: Person::User, content: String::new() });
+    log.push(Message { person: Person::Assistant, content: char.first_message });
+
+    let url = format!("http://{}/create", state.link);
+    let new_memory_id = state
+        .http_client
+        .get(url)
+        .send()
+        .await
+        .map_err(|err| err.to_string())?
+        .text()
+        .await
+        .map_err(|err| err.to_string())?;
+
+    let conversation = CharacterConversation {
+        log,
+        from_char_id: char_id,
+        memory_id: new_memory_id,
+        id: Uuid::new_v4().to_string(),
+    };
+    transaction
+        .insert(conversation)
+        .map_err(|err| err.to_string())?;
+    transaction.commit().map_err(|err| err.to_string())?;
+
+    Ok(())
+}
+
+/////////////// CHARACTER //////////////////////
+
+#[tauri::command]
+fn add_character(
+    state: State<'_, Mutex<AppState>>,
+    first_message: String,
+    name: String,
+    system_message: String,
+    description: String,
+) -> Result<(), String> {
+    let state = state.blocking_lock();
+    let transaction = state
+        .char_db
+        .rw_transaction()
+        .map_err(|err| err.to_string())?;
+    transaction
+        .insert(Character {
+            system_message,
+            first_message,
+            name,
+            description,
+            id: Uuid::new_v4().to_string(),
+            conversations: Vec::new(),
+        })
+        .map_err(|err| err.to_string())?;
+
+    transaction.commit().map_err(|err| err.to_string())?;
+
+    Ok(())
+}
+
 #[tauri::command]
 fn grab_character_list(state: State<'_, Mutex<AppState>>) -> Result<Vec<Character>, String> {
     let state = state.blocking_lock();
-    let transaction = state.db.r_transaction().unwrap();
+    let transaction = state.char_db.r_transaction().unwrap();
     let list = transaction.scan().primary::<Character>().unwrap();
     let chars: Vec<Character> = list
         .all()
-        .map_err(|err| { err.to_string() })?
+        .map_err(|err| err.to_string())?
         .map(|v| v.unwrap())
         .collect();
 
@@ -80,13 +180,39 @@ fn grab_character_list(state: State<'_, Mutex<AppState>>) -> Result<Vec<Characte
 }
 
 #[tauri::command]
-fn grab_character(state: State<'_, Mutex<AppState>>, id: u32) -> Character {
+fn grab_character(state: State<'_, Mutex<AppState>>, id: String) -> Result<Character, String> {
     let state = state.blocking_lock();
-    let transaction = state.db.r_transaction().unwrap();
-    let char: Character = transaction.get().primary(id).unwrap().unwrap();
-    
-    char
+    let transaction = state.char_db.r_transaction().unwrap();
+    let char: Character = transaction
+        .get()
+        .primary(id)
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| String::from(""))?;
+
+    Ok(char)
 }
+
+#[tauri::command]
+fn delete_character(state: State<'_, Mutex<AppState>>, id: String) -> Result<(), String> {
+    let state = state.blocking_lock();
+    let transaction = state
+        .char_db
+        .rw_transaction()
+        .map_err(|err| err.to_string())?;
+    let character: Character = transaction
+        .get()
+        .primary(id)
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| String::from(""))?;
+    transaction
+        .remove(character)
+        .map_err(|err| err.to_string())?;
+    transaction.commit().map_err(|err| err.to_string())?;
+
+    Ok(())
+}
+
+/////////////////// ESSENTIALS //////////////////
 
 #[tauri::command]
 fn change_link(link: &str, state: State<'_, Mutex<AppState>>) {
@@ -94,52 +220,60 @@ fn change_link(link: &str, state: State<'_, Mutex<AppState>>) {
     state.link = link.to_string();
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
-fn greet(name: &str, state: State<'_, Mutex<AppState>>) -> String {
-    let mut state = state.blocking_lock();
-    state.counter += 1;
-
-    format!("Hello, {}! You've been greeted from Rust! Called {} times.", name, state.counter)
-}
-
-#[tauri::command]
-async fn create_ai_message(conversationjson: &str, state: State<'_, Mutex<AppState>>) -> Result<String, String> {
+async fn create_ai_message(
+    conversationjson: &str,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<String, String> {
     let state = state.lock().await;
 
     let url = format!("http://{}/complete", state.link);
-
-    let res = state.http_client
+    let res = state
+        .http_client
         .post(url)
         .body(conversationjson.to_string())
         .header("Content-Type", "application/json")
         .send()
         .await
-        .map_err(|err| { err.to_string() })?
+        .map_err(|err| err.to_string())?
         .text()
         .await
-        .map_err(|err| { err.to_string() })?;
+        .map_err(|err| err.to_string())?;
 
     Ok(res)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let db = Builder::new().create_in_memory(&MODELS).unwrap();
+    let character_db = Builder::new().create_in_memory(&MODELS).unwrap();
 
     tauri::Builder::default()
         .setup(|app| {
             let appstate = AppState {
-                counter: 0,
                 link: String::new(),
                 http_client: Client::new(),
-                db,
+                char_db: character_db,
             };
             app.manage(Mutex::new(appstate));
             Ok(())
         })
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![greet, change_link, create_ai_message, grab_character_list, grab_character])
+        .invoke_handler(tauri::generate_handler![
+            change_link,
+            create_ai_message,
+
+            grab_character,
+            grab_character_list,
+
+            grab_conversation,
+            grab_conversation_list,
+
+            add_character,
+            delete_character,
+
+            add_conversation,
+
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
