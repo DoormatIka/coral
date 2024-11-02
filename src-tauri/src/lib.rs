@@ -59,6 +59,7 @@ struct CharacterConversation {
 static MODELS: Lazy<Models> = Lazy::new(|| {
     let mut models = Models::new();
     models.define::<Character>().unwrap();
+    models.define::<CharacterConversation>().unwrap();
     models
 });
 
@@ -169,8 +170,10 @@ fn add_character(
 fn grab_character_list(state: State<'_, Mutex<AppState>>) -> Result<Vec<Character>, String> {
     let state = state.blocking_lock();
     let transaction = state.char_db.r_transaction().unwrap();
-    let list = transaction.scan().primary::<Character>().unwrap();
-    let chars: Vec<Character> = list
+    let chars = transaction
+        .scan()
+        .primary::<Character>()
+        .map_err(|err| err.to_string())?
         .all()
         .map_err(|err| err.to_string())?
         .map(|v| v.unwrap())

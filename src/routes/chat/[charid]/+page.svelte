@@ -1,36 +1,25 @@
 <script lang="ts">
+  import type { PageData } from './$types';
   import {onMount} from "svelte";
   import {fly} from "svelte/transition";
   import {invoke} from "@tauri-apps/api/core";
-  import {currentSystemMessage} from "../chat";
+  import type {Message, MessageRequest} from '../../types';
 
-  type Message = { person: "system" | "user" | "assistant", content: string };
-  type MessageRequest = {
-    memory_id: string,
-    memories: Message[],
-    log: Message[],
-    regen: boolean,
-  }
-
-  let current_system_message = '';
-  currentSystemMessage.subscribe(value => current_system_message = value);
+  let { data }: { data: PageData } = $props();
+  let chats: Message[] = $state(data.conversation.log);
 
   let chatelement: HTMLElement;
   let sendbutton: HTMLButtonElement;
-  onMount(() => {
+  onMount(async () => {
     chatelement = document.getElementById("chat")!;
     sendbutton = document.getElementById("sendbutton")! as HTMLButtonElement;
 
     setTimeout(() => { chatelement.scrollBy({top: 99999, behavior: "smooth"}) }, 500);
   });
-  let user_input = $state("");
-  const chats: Message[] = $state([
-    {person: "system", content: "[INST]"+ current_system_message +"[/INST]"},
-    {person: "user", content: ""},
-    {person: "assistant", content: "Hello there~"},
-  ]);
 
+  // user input stuff
   
+  let user_input = $state("");
   function showEditModal() {
     const my_modal_2 = document.getElementById("editmodal")! as any;
     my_modal_2.showModal();
@@ -44,6 +33,7 @@
     selected_message = 0;
     user_edit_msg = "";
   }
+
   async function regenMessage(index: number) {
     const user_msg = chats.splice(index)[0];
     await sendMessage(user_msg.content, true);
@@ -51,13 +41,14 @@
   
   async function sendMessage(message: string, regen: boolean) {
     if (message.trim() !== "") {
-      const api_chat = chats.length <= 20 ? chats : [chats[0], ...chats.slice(-20).filter((_, i) => i > 0)];
+      //                includes sys msg                 21 in length.
+      const api_chat = chats.length <= 21 ? chats : [chats[0], ...chats.slice(-20).filter((_, i) => i > 0)];
 
       const apisend: MessageRequest = {
         "memory_id": "c9732cf2-c734-47cf-89f1-95a9cbd1e3b7-sato-chat",
         "log": api_chat,
         "regen": regen,
-        "memories": api_chat.slice(-21, -22),
+        "memories": api_chat.slice(-22, -23),
       }
 
       chats.push({person: "user", content: structuredClone(message)});
