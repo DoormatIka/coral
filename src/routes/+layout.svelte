@@ -3,29 +3,34 @@
   import Avatar from "$lib/Avatar.svelte";
   import { page } from "$app/stores";
   import { invoke } from "@tauri-apps/api/core";
-  import { currentSystemMessage } from "./chat";
 
-  let current_link = "10.147.18.27";
-  let current_system_message = ""; // working now
+  let isOnline = $state(true);
 
+  let current_link = $state("10.147.18.27");
   const avatars = [
     "https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp",
     "https://cdn.discordapp.com/attachments/914427100935647245/1298626589063381073/image.png?ex=671ae882&is=67199702&hm=09d4844da579a73b73180d3fa1b3f8b2fa93cbcf32c57f0ce17202e2ae21bcc9&",
     "https://cdn.discordapp.com/attachments/914427100935647245/1298618003021365309/FB_IMG_1729685032217.jpg?ex=671ae083&is=67198f03&hm=6587407ef9e9f3e65999552e0130877fa3e3b9e441941c3f73666066ce3276be&",
   ];
-  function showSysMessageModal() {
-    const my_modal_2 = document.getElementById("system_message_modal")! as any;
-    my_modal_2.showModal();
-  }
+
   function showIPModal() {
     const my_modal_2 = document.getElementById("my_modal_2")! as any;
     my_modal_2.showModal();
   }
+  // getLink function...
   async function changeLink() {
     await invoke("change_link", { link: current_link });
   }
-  function setSystemMessage() {
-    currentSystemMessage.set(current_system_message);
+  async function linkSanityCheck() {
+    try {
+      await fetch("http://" + current_link + "/ping", {
+        method: "GET",
+        mode: "no-cors",
+      });
+      isOnline = true;
+    } catch (err) {
+      isOnline = false;
+    }
   }
 
 </script>
@@ -48,12 +53,10 @@
             <iconify-icon icon="weui:back-filled" class="text-3xl py-3" style="vertical-align: -0.125em;"></iconify-icon>
           </a>
         {:else}
-          <button onclick={showSysMessageModal} aria-label="id">
-            <iconify-icon icon="mdi:book" class="text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
-          </button>
           <button onclick={showIPModal} aria-label="id">
             <iconify-icon icon="mdi:ip" class="text-3xl py-3" style="vertical-align: -0.125em;"></iconify-icon>
           </button>
+          <button onclick={linkSanityCheck} class="btn btn-outline">Sanity Check: {isOnline ? "Sane" : "Insane"}</button>
         {/if}
       </div>
 
@@ -71,23 +74,6 @@
 
           <form method="dialog">
             <button class="bg-neutral btn p-3 w-full mt-2" onclick={changeLink}>Set</button>
-          </form>
-        </div>
-        <form method="dialog" class="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
-    
-      <!-- Sys Message Modal -->
-      <dialog id="system_message_modal" class="modal overflow-hidden">
-        <div class="modal-box bg-base-200">
-          <form method="dialog" class="sm:block hidden">
-            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">X</button>
-          </form>
-          <h3 class="text-2xl font-bold mb-3">Set your character's system message here.</h3>
-          <textarea class="w-full textarea-bordered textarea" bind:value={current_system_message} placeholder="Kogasa is cute!"></textarea>
-          <form method="dialog">
-            <button class="bg-neutral btn p-3 w-full mt-2" onclick={setSystemMessage}>Set</button>
           </form>
         </div>
         <form method="dialog" class="modal-backdrop">

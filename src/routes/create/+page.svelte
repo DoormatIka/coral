@@ -47,12 +47,12 @@
 </dialog>
 
 <div class="flex flex-col items-center overflow-hidden h-full">
-  <form onsubmit={addCharacterToDatabase} class="flex-col flex h-full items-center justify-center gap-3 w-1/2">
+  <form onsubmit={addCharacterToDatabase} class="h-full w-full p-5 overflow-y-auto">
     <h2>Create Character</h2>
-    <input type="text" name="name" class="input input-bordered w-full" placeholder="Name" required />
-    <textarea name="description" class="w-full textarea textarea-bordered" placeholder="Description" required></textarea>
-    <textarea name="first_message" class="w-full textarea textarea-bordered" placeholder="First Message" required></textarea>
-    <textarea name="system_message" class="w-full textarea textarea-bordered" placeholder="System Message" required></textarea>
-    <button type="submit" class="w-full btn btn-neutral">Submit</button>
+    <input type="text" name="name" class="mt-3 input input-bordered w-full" placeholder="Name" required />
+    <textarea name="description" class="mt-3 w-full textarea textarea-bordered" placeholder="Description" required></textarea>
+    <textarea name="first_message" class="mt-3 w-full textarea textarea-bordered" placeholder="First Message" required></textarea>
+    <textarea name="system_message" class="mt-3 w-full textarea textarea-bordered" placeholder="System Message" required></textarea>
+    <button type="submit" class="mt-5 w-full btn btn-neutral">Submit</button>
   </form>
 </div>

@@ -17,6 +17,7 @@
     setTimeout(() => { chatelement.scrollBy({top: 99999, behavior: "smooth"}) }, 500);
   });
 
+
   // user input stuff
   
   let user_input = $state("");
@@ -38,35 +39,56 @@
     const user_msg = chats.splice(index)[0];
     await sendMessage(user_msg.content, true);
   }
+  function trimMessages(chats: Message[], len: number = 20): { log: Message[], memories: Message[] } {
+    const system_prompt = chats[0];
+    const user_messages = chats.slice(1);
+
+    const log: Message[] = [];
+    const memories: Message[] = [];
+
+    if (user_messages.length <= len) {
+      log.push(system_prompt);
+      log.push(...user_messages);
+    } else {
+      const last_2_messages_before_the_twenty_messages = user_messages.slice(-len - 2, -len);
+      const previous_twenty_messages = user_messages.slice(-len);
+      log.push(system_prompt);
+      log.push(...previous_twenty_messages);
+      memories.push(...last_2_messages_before_the_twenty_messages);
+    }
+    return {
+      log: log,
+      memories: memories,
+    };
+  }
   
   async function sendMessage(message: string, regen: boolean) {
     if (message.trim() !== "") {
-      //                includes sys msg                 21 in length.
-      const api_chat = chats.length <= 21 ? chats : [chats[0], ...chats.slice(-20).filter((_, i) => i > 0)];
+      chats.push({person: "user", content: structuredClone(message)});
 
+      const { log, memories } = trimMessages(chats, 4);
       const apisend: MessageRequest = {
-        "memory_id": "c9732cf2-c734-47cf-89f1-95a9cbd1e3b7-sato-chat",
-        "log": api_chat,
+        "memory_id": data.conversation.memory_id,
+        "log": log,
         "regen": regen,
-        "memories": api_chat.slice(-22, -23),
+        "memories": memories,
       }
 
-      chats.push({person: "user", content: structuredClone(message)});
       user_input = "";
       setTimeout(() => { chatelement.scrollBy({top: 99999, behavior: "smooth"}) }, 100);
 
       sendbutton.disabled = true;
-
       try {
+        console.log(apisend);
         const rawMsg: string = await invoke("create_ai_message", {conversationjson: JSON.stringify(apisend)});
+        console.log(rawMsg);
         const msg: {message: string} = JSON.parse(rawMsg);
         chats.push({ person: "assistant", content: msg.message.trim()});
-        sendbutton.disabled = false;
       } catch (err) {
         chats.pop();
         user_input = err as string;
-        sendbutton.disabled = false;
       }
+      sendbutton.disabled = false;
 
       setTimeout(() => { chatelement.scrollBy({top: 99999, behavior: "smooth"}) }, 100);
     }

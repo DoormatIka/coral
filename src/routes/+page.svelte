@@ -24,7 +24,7 @@
     <div class="grid xl:grid-cols-5 md:grid-cols-2 grid-cols-1 gap-5">
       {#each characters as char}
         <div class="m-auto h-48 my-7 w-full">
-          <a href="/chat/{char.id}">
+          <a href="/chat/{char.id}" data-sveltekit-preload-data="off">
             <Card title={char.name} description={char.description} link={image_link}/>
           </a>
         </div>

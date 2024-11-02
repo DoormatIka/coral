@@ -94,11 +94,12 @@ fn grab_conversation_list(state: State<'_, Mutex<AppState>>, char_id: String) ->
 }
 
 #[tauri::command]
-async fn add_conversation(state: State<'_, Mutex<AppState>>, char_id: String) -> Result<(), String> {
-    let state = state.blocking_lock();
+async fn add_conversation(state: State<'_, Mutex<AppState>>, char_id: String) -> Result<String, String> {
+    let state = state.lock().await;
     let transaction = state.char_db.rw_transaction().unwrap();
 
     let mut log: Vec<Message> = Vec::new();
+    let id = Uuid::new_v4().to_string();
 
     let char: Character = transaction
         .get()
@@ -123,16 +124,16 @@ async fn add_conversation(state: State<'_, Mutex<AppState>>, char_id: String) ->
 
     let conversation = CharacterConversation {
         log,
+        id: id.clone(),
         from_char_id: char_id,
         memory_id: new_memory_id,
-        id: Uuid::new_v4().to_string(),
     };
     transaction
         .insert(conversation)
         .map_err(|err| err.to_string())?;
     transaction.commit().map_err(|err| err.to_string())?;
 
-    Ok(())
+    Ok(id)
 }
 
 /////////////// CHARACTER //////////////////////
