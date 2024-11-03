@@ -10,6 +10,10 @@ use native_db::*;
 use native_model::{native_model, Model};
 use once_cell::sync::Lazy;
 
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
+use std::path::{self, Path};
+
 struct AppState {
     link: String,
     http_client: Client,
@@ -17,7 +21,7 @@ struct AppState {
 }
 
 // will need all these types when i make client-side databases.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "lowercase")]
 enum Person {
     Assistant,
@@ -25,13 +29,13 @@ enum Person {
     User,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct Message {
     person: Person,
     content: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[native_model(id = 1, version = 1)]
 #[native_db]
 struct Character {
@@ -44,7 +48,7 @@ struct Character {
     conversations: Vec<String>, // use IDs instead.
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[native_model(id = 2, version = 1)]
 #[native_db]
 struct CharacterConversation {
@@ -68,16 +72,55 @@ static MODELS: Lazy<Models> = Lazy::new(|| {
 ///////////////////// CONVERSATION ///////////////////////
 
 #[tauri::command]
-fn grab_conversation(state: State<'_, Mutex<AppState>>, id: String) -> Result<CharacterConversation, String> {
+fn grab_conversation(
+    state: State<'_, Mutex<AppState>>,
+    chat_id: String,
+) -> Result<CharacterConversation, String> {
     let state = state.blocking_lock();
     let transaction = state.char_db.r_transaction().unwrap();
-    let conversation: CharacterConversation = transaction.get().primary(id).map_err(|err| err.to_string())?.ok_or_else(|| String::from("Chat does not exist!"))?;
+    let conversation: CharacterConversation = transaction
+        .get()
+        .primary(chat_id)
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| String::from("Chat does not exist!"))?;
 
     Ok(conversation)
 }
 
 #[tauri::command]
-fn grab_conversation_list(state: State<'_, Mutex<AppState>>, char_id: String) -> Result<Vec<CharacterConversation>, String> {
+async fn update_conversation_log(
+    state: State<'_, Mutex<AppState>>,
+    chat_id: String,
+    log: Vec<Message>,
+) -> Result<(), String> {
+    let state = state.lock().await;
+    let transaction = state.char_db.rw_transaction().unwrap();
+    let conversation: CharacterConversation = transaction
+        .get()
+        .primary(chat_id)
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| String::from("Chat does not exist!"))?;
+    transaction
+        .update(
+            conversation.clone(),
+            CharacterConversation {
+                log,
+                id: conversation.id,
+                from_char_id: conversation.from_char_id,
+                memory_id: conversation.memory_id,
+            },
+        )
+        .map_err(|err| err.to_string())?;
+    transaction.commit().map_err(|err| err.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn grab_conversation_list(
+    state: State<'_, Mutex<AppState>>,
+    char_id: String,
+) -> Result<Vec<CharacterConversation>, String> {
     let state = state.blocking_lock();
     let transaction = state.char_db.r_transaction().unwrap();
 
@@ -94,7 +137,10 @@ fn grab_conversation_list(state: State<'_, Mutex<AppState>>, char_id: String) ->
 }
 
 #[tauri::command]
-async fn add_conversation(state: State<'_, Mutex<AppState>>, char_id: String) -> Result<String, String> {
+async fn add_conversation(
+    state: State<'_, Mutex<AppState>>,
+    char_id: String,
+) -> Result<String, String> {
     let state = state.lock().await;
     let transaction = state.char_db.rw_transaction().unwrap();
 
@@ -107,9 +153,18 @@ async fn add_conversation(state: State<'_, Mutex<AppState>>, char_id: String) ->
         .map_err(|err| err.to_string())?
         .ok_or_else(|| String::from(""))?;
 
-    log.push(Message { person: Person::System, content: char.system_message });
-    log.push(Message { person: Person::User, content: String::new() });
-    log.push(Message { person: Person::Assistant, content: char.first_message });
+    log.push(Message {
+        person: Person::System,
+        content: char.system_message,
+    });
+    log.push(Message {
+        person: Person::User,
+        content: String::new(),
+    });
+    log.push(Message {
+        person: Person::Assistant,
+        content: char.first_message,
+    });
 
     let url = format!("http://{}/create", state.link);
     let new_memory_id = state
@@ -197,6 +252,41 @@ fn grab_character(state: State<'_, Mutex<AppState>>, id: String) -> Result<Chara
 }
 
 #[tauri::command]
+fn update_character(
+    state: State<'_, Mutex<AppState>>,
+    char_id: String,
+    name: Option<String>,
+    description: Option<String>,
+    system_message: Option<String>,
+    first_message: Option<String>,
+    conversations: Option<Vec<String>>,
+) -> Result<(), String> {
+    let state = state.blocking_lock();
+    let transaction = state.char_db.rw_transaction().unwrap();
+    let char: Character = transaction
+        .get()
+        .primary(char_id)
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| String::from(""))?;
+    transaction
+        .update(
+            char.clone(),
+            Character {
+                id: char.id,
+                name: name.unwrap_or(char.name),
+                description: description.unwrap_or(char.description),
+                system_message: system_message.unwrap_or(char.system_message),
+                first_message: first_message.unwrap_or(char.first_message),
+                conversations: conversations.unwrap_or(char.conversations),
+            },
+        )
+        .map_err(|err| err.to_string())?;
+    transaction.commit().map_err(|err| err.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
 fn delete_character(state: State<'_, Mutex<AppState>>, id: String) -> Result<(), String> {
     let state = state.blocking_lock();
     let transaction = state
@@ -247,12 +337,50 @@ async fn create_ai_message(
     Ok(res)
 }
 
+#[tauri::command]
+fn clear_all(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
+    let state = state.blocking_lock();
+
+    let transaction = state
+        .char_db
+        .rw_transaction()
+        .map_err(|err| err.to_string())?;
+    let all: Vec<Character> = transaction
+        .scan()
+        .primary()
+        .map_err(|err| err.to_string())?
+        .all()
+        .map_err(|err| err.to_string())?
+        .map(|v| v.unwrap())
+        .collect();
+    for elem in all {
+        transaction.remove(elem).map_err(|err| err.to_string())?;
+    }
+    transaction.commit().map_err(|err| err.to_string())?;
+
+    Ok(())
+}
+
+fn read_or_create_file(path: &str) -> std::io::Result<()> {
+    if !Path::new(path).exists() {
+        fs::create_dir_all(path).expect("Failed to create directory.");
+    }
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(path)?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let character_db = Builder::new().create_in_memory(&MODELS).unwrap();
-
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
+            let dir = app.path().app_data_dir().expect("couldn't resolve app data dir").join("data");
+            read_or_create_file(dir.to_str().unwrap()).unwrap();
+            let character_db = Builder::new().create(&MODELS, dir).unwrap();
             let appstate = AppState {
                 link: String::new(),
                 http_client: Client::new(),
@@ -265,18 +393,16 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             change_link,
             create_ai_message,
-
             grab_character,
             grab_character_list,
-
             grab_conversation,
             grab_conversation_list,
-
             add_character,
             delete_character,
-
+            update_character,
             add_conversation,
-
+            update_conversation_log,
+            clear_all,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
