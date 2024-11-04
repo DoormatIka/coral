@@ -3,9 +3,14 @@
   import {invoke} from "@tauri-apps/api/core";
   import {onMount} from "svelte";
   import {type Character} from "./types";
+  import { base } from '$app/paths'
 
-  const image_link = "https://cdn.discordapp.com/attachments/1063526734969974907/1301948621083775046/IMG_2547.jpg?ex=672655a4&is=67250424&hm=d6fbaccce10893532adc666ea92d6cab7a235353f49cd774f0656bb04b80929d&";
+  const image_link = `${base}/no_image.png`;
+  onMount(async () => {
+    await getCharacters();
+  })
 
+  let characters: Character[] = $state([]);
   async function getCharacters() {
     try {
       characters = await invoke("grab_character_list");
@@ -13,22 +18,30 @@
       console.log(err);
     }
   }
-  
-  let characters: Character[] = [];
-  onMount(() => {
-    getCharacters();
-  })
 </script>
 
-<div class="px-5 pb-10 overflow-y-auto w-full h-full">
-    <div class="grid xl:grid-cols-5 md:grid-cols-2 grid-cols-1 gap-5">
-      {#each characters as char}
-        <div class="m-auto h-48 my-7 w-full">
-          <a href="/chat/{char.id}" data-sveltekit-preload-data="off">
-            <Card title={char.name} description={char.description} link={image_link}/>
-          </a>
-        </div>
-      {/each}
-    </div>
+<div class="px-5 py-10 overflow-y-auto w-full h-full">
+    {#if characters.length > 0}
+      <div class="sm:grid xl:grid-cols-4 sm:grid-cols-2 flex flex-col gap-5">
+        {#each characters as char}
+          <div class="m-auto w-full h-40 sm:h-auto">
+            <Card 
+              title={char.name} 
+              description={char.description} 
+              image_link={image_link} 
+              link="/chat/{char.id}"
+              removeCharacter={async () => {
+                await invoke("delete_character", {id: char.id}) 
+                await getCharacters();
+              }}
+            />
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <div class="flex flex-col justify-center items-center h-full gap-3">
+        <h2 class="text-secondary-content opacity-60">No character made.</h2>
+      </div>
+    {/if}
 </div>
 

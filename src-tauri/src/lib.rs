@@ -15,9 +15,8 @@ use std::io::{Read, Write};
 use std::path::{self, Path};
 
 struct AppState {
-    link: String,
     http_client: Client,
-    char_db: Database<'static>,
+    db: Database<'static>,
 }
 
 // will need all these types when i make client-side databases.
@@ -60,10 +59,20 @@ struct CharacterConversation {
     log: Vec<Message>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[native_model(id = 3, version = 1)]
+#[native_db]
+struct Settings {
+    #[primary_key]
+    id: String,
+    link: String,
+}
+
 static MODELS: Lazy<Models> = Lazy::new(|| {
     let mut models = Models::new();
     models.define::<Character>().unwrap();
     models.define::<CharacterConversation>().unwrap();
+    models.define::<Settings>().unwrap();
     models
 });
 
@@ -77,7 +86,7 @@ fn grab_conversation(
     chat_id: String,
 ) -> Result<CharacterConversation, String> {
     let state = state.blocking_lock();
-    let transaction = state.char_db.r_transaction().unwrap();
+    let transaction = state.db.r_transaction().unwrap();
     let conversation: CharacterConversation = transaction
         .get()
         .primary(chat_id)
@@ -94,7 +103,7 @@ async fn update_conversation_log(
     log: Vec<Message>,
 ) -> Result<(), String> {
     let state = state.lock().await;
-    let transaction = state.char_db.rw_transaction().unwrap();
+    let transaction = state.db.rw_transaction().unwrap();
     let conversation: CharacterConversation = transaction
         .get()
         .primary(chat_id)
@@ -122,7 +131,7 @@ fn grab_conversation_list(
     char_id: String,
 ) -> Result<Vec<CharacterConversation>, String> {
     let state = state.blocking_lock();
-    let transaction = state.char_db.r_transaction().unwrap();
+    let transaction = state.db.r_transaction().unwrap();
 
     let char_list: Vec<CharacterConversation> = transaction
         .scan()
@@ -142,7 +151,7 @@ async fn add_conversation(
     char_id: String,
 ) -> Result<String, String> {
     let state = state.lock().await;
-    let transaction = state.char_db.rw_transaction().unwrap();
+    let transaction = state.db.rw_transaction().unwrap();
 
     let mut log: Vec<Message> = Vec::new();
     let id = Uuid::new_v4().to_string();
@@ -166,7 +175,12 @@ async fn add_conversation(
         content: char.first_message,
     });
 
-    let url = format!("http://{}/create", state.link);
+    let settings: Settings = transaction
+        .get()
+        .primary(String::from("123"))
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| String::from("Settings does not exist."))?;
+    let url = format!("http://{}/create", settings.link);
     let new_memory_id = state
         .http_client
         .get(url)
@@ -196,23 +210,23 @@ async fn add_conversation(
 #[tauri::command]
 fn add_character(
     state: State<'_, Mutex<AppState>>,
-    first_message: String,
     name: String,
-    system_message: String,
     description: String,
+    first_message: String,
+    system_message: String,
 ) -> Result<(), String> {
     let state = state.blocking_lock();
     let transaction = state
-        .char_db
+        .db
         .rw_transaction()
         .map_err(|err| err.to_string())?;
     transaction
         .insert(Character {
-            system_message,
-            first_message,
+            id: Uuid::new_v4().to_string(),
             name,
             description,
-            id: Uuid::new_v4().to_string(),
+            system_message,
+            first_message,
             conversations: Vec::new(),
         })
         .map_err(|err| err.to_string())?;
@@ -225,7 +239,7 @@ fn add_character(
 #[tauri::command]
 fn grab_character_list(state: State<'_, Mutex<AppState>>) -> Result<Vec<Character>, String> {
     let state = state.blocking_lock();
-    let transaction = state.char_db.r_transaction().unwrap();
+    let transaction = state.db.r_transaction().unwrap();
     let chars = transaction
         .scan()
         .primary::<Character>()
@@ -241,7 +255,7 @@ fn grab_character_list(state: State<'_, Mutex<AppState>>) -> Result<Vec<Characte
 #[tauri::command]
 fn grab_character(state: State<'_, Mutex<AppState>>, id: String) -> Result<Character, String> {
     let state = state.blocking_lock();
-    let transaction = state.char_db.r_transaction().unwrap();
+    let transaction = state.db.r_transaction().unwrap();
     let char: Character = transaction
         .get()
         .primary(id)
@@ -262,7 +276,7 @@ fn update_character(
     conversations: Option<Vec<String>>,
 ) -> Result<(), String> {
     let state = state.blocking_lock();
-    let transaction = state.char_db.rw_transaction().unwrap();
+    let transaction = state.db.rw_transaction().unwrap();
     let char: Character = transaction
         .get()
         .primary(char_id)
@@ -290,7 +304,7 @@ fn update_character(
 fn delete_character(state: State<'_, Mutex<AppState>>, id: String) -> Result<(), String> {
     let state = state.blocking_lock();
     let transaction = state
-        .char_db
+        .db
         .rw_transaction()
         .map_err(|err| err.to_string())?;
     let character: Character = transaction
@@ -309,9 +323,34 @@ fn delete_character(state: State<'_, Mutex<AppState>>, id: String) -> Result<(),
 /////////////////// ESSENTIALS //////////////////
 
 #[tauri::command]
-fn change_link(link: &str, state: State<'_, Mutex<AppState>>) {
-    let mut state = state.blocking_lock();
-    state.link = link.to_string();
+fn change_link(link: String, state: State<'_, Mutex<AppState>>) -> Result<(), String> {
+    let state = state.blocking_lock();
+    let transaction = state
+        .db
+        .rw_transaction()
+        .map_err(|err| err.to_string())?;
+    transaction
+        .upsert(Settings { id: String::from("123"), link })
+        .map_err(|err| err.to_string())?;
+    transaction.commit().map_err(|err| err.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn grab_link(state: State<'_, Mutex<AppState>>) -> Result<String, String> {
+    let state = state.blocking_lock();
+    let transaction = state
+        .db
+        .r_transaction()
+        .map_err(|err| err.to_string())?;
+    let settings: Settings = transaction
+        .get()
+        .primary(String::from("123"))
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| String::from("Settings does not exist."))?;
+
+    Ok(settings.link)
 }
 
 #[tauri::command]
@@ -320,8 +359,17 @@ async fn create_ai_message(
     state: State<'_, Mutex<AppState>>,
 ) -> Result<String, String> {
     let state = state.lock().await;
+    let transaction = state
+        .db
+        .r_transaction()
+        .map_err(|err| err.to_string())?;
+    let settings: Settings = transaction
+        .get()
+        .primary(String::from("123"))
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| String::from("Settings does not exist."))?;
 
-    let url = format!("http://{}/complete", state.link);
+    let url = format!("http://{}/complete", settings.link);
     let res = state
         .http_client
         .post(url)
@@ -340,11 +388,11 @@ async fn create_ai_message(
 #[tauri::command]
 fn clear_all(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
     let state = state.blocking_lock();
-
     let transaction = state
-        .char_db
+        .db
         .rw_transaction()
         .map_err(|err| err.to_string())?;
+
     let all: Vec<Character> = transaction
         .scan()
         .primary()
@@ -362,8 +410,11 @@ fn clear_all(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
 }
 
 fn read_or_create_file(path: &str) -> std::io::Result<()> {
-    if !Path::new(path).exists() {
-        fs::create_dir_all(path).expect("Failed to create directory.");
+    let path = Path::new(path);
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).expect("Failed to create directory.");
+        }
     }
     OpenOptions::new()
         .read(true)
@@ -378,20 +429,20 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
-            let dir = app.path().app_data_dir().expect("couldn't resolve app data dir").join("data");
+            let dir = app.path().app_local_data_dir().expect("couldn't resolve app data dir").join("data");
+
             read_or_create_file(dir.to_str().unwrap()).unwrap();
-            let character_db = Builder::new().create(&MODELS, dir).unwrap();
-            let appstate = AppState {
-                link: String::new(),
-                http_client: Client::new(),
-                char_db: character_db,
-            };
+            let db = Builder::new().create(&MODELS, dir).unwrap();
+            let appstate = AppState { db, http_client: Client::new() };
+
             app.manage(Mutex::new(appstate));
+
             Ok(())
         })
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             change_link,
+            grab_link,
             create_ai_message,
             grab_character,
             grab_character_list,

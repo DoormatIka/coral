@@ -43,22 +43,31 @@
     const system_prompt = chats[0];
     const user_messages = chats.slice(1);
 
-    const log: Message[] = [];
+    const log: Message[] = [system_prompt];
     const memories: Message[] = [];
 
-    if (user_messages.length <= len) {
-      log.push(system_prompt);
-      log.push(...user_messages);
-    } else {
-      const last_2_messages_before_the_twenty_messages = user_messages.slice(-len - 2, -len);
+    if (user_messages.length > len + 2) {
       const previous_twenty_messages = user_messages.slice(-len);
-      log.push(system_prompt);
-      log.push(...previous_twenty_messages);
-      memories.push(...last_2_messages_before_the_twenty_messages);
+      const two_before_previous_twenty = user_messages.slice(-len - 2, -len);
+      log.push(...two_before_previous_twenty, ...previous_twenty_messages);
+      memories.push(...two_before_previous_twenty);
+    } else {
+      log.push(...user_messages);
     }
+
+    const ordered_log: Message[] = [system_prompt];
+    let expect_user = true;
+
+    for (const message of log.slice(1)) {
+      if ((expect_user && message.person === 'user') || (!expect_user && message.person === 'assistant')) {
+        ordered_log.push(message);
+        expect_user = !expect_user;
+      }
+    }
+
     return {
-      log: log,
-      memories: memories,
+      log: ordered_log,
+      memories,
     };
   }
   
@@ -66,7 +75,7 @@
     if (message.trim() !== "") {
       chats.push({person: "user", content: structuredClone(message)});
 
-      const { log, memories } = trimMessages(chats, 4);
+      const { log, memories } = trimMessages(chats, 20);
       const apisend: MessageRequest = {
         "memory_id": data.conversation.memory_id,
         "log": log,
@@ -79,9 +88,7 @@
 
       sendbutton.disabled = true;
       try {
-        console.log(apisend);
         const rawMsg: string = await invoke("create_ai_message", {conversationjson: JSON.stringify(apisend)});
-        console.log(rawMsg);
         const msg: {message: string} = JSON.parse(rawMsg);
         chats.push({ person: "assistant", content: msg.message.trim()});
       } catch (err) {
@@ -89,6 +96,7 @@
         user_input = err as string;
       }
       sendbutton.disabled = false;
+      await invoke("update_conversation_log", {chatId: data.conversation.id, log: chats}).catch((err) => { user_input = err as string; });
 
       setTimeout(() => { chatelement.scrollBy({top: 99999, behavior: "smooth"}) }, 100);
     }

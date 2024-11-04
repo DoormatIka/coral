@@ -12,13 +12,14 @@ export const load: PageLoad = async ({ params }) => {
 	}
 	try {
 		const char_details: Character = await invoke("grab_character", {"id": params.charid}); // first_message (in rust) = firstMessage (in JS) :(
-		const convo = char_details.conversations.at(0);
+		const conversation_id = char_details.conversations.at(0);
 		let conversation: CharacterConversation;
-		if (convo) {
-			conversation = await invoke("grab_conversation", {"id": convo});
+		if (conversation_id) {
+			conversation = await invoke("grab_conversation", {chatId: conversation_id});
 		} else {
 			const conversation_id = await invoke("add_conversation", {charId: char_details.id});
-			conversation = await invoke("grab_conversation", {"id": conversation_id});
+			await invoke("update_character", {charId: char_details.id, conversations: [conversation_id]});
+			conversation = await invoke("grab_conversation", {chatId: conversation_id});
 			// havent set the character's conversation yet, use update for this.
 		}
 		return {character: char_details, conversation: conversation};
