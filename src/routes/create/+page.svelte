@@ -46,13 +46,11 @@
   </form>
 </dialog>
 
-<div class="flex flex-col items-center overflow-hidden h-full">
-  <form onsubmit={addCharacterToDatabase} class="h-full w-full p-5 overflow-y-auto">
-    <h2>Create Character</h2>
-    <input type="text" name="name" class="mt-3 input input-bordered w-full" placeholder="Name" required />
-    <textarea name="description" class="mt-3 w-full textarea textarea-bordered" placeholder="Description" required></textarea>
-    <textarea name="first_message" class="mt-3 w-full textarea textarea-bordered" placeholder="First Message" required></textarea>
-    <textarea name="system_message" class="mt-3 w-full textarea textarea-bordered" placeholder="System Message" required></textarea>
-    <button type="submit" class="mt-5 w-full btn btn-neutral">Submit</button>
-  </form>
-</div>
+<form onsubmit={addCharacterToDatabase} class="h-full w-full p-5 overflow-y-auto m-auto">
+  <h2>Create Character</h2>
+  <input type="text" name="name" class="mt-3 input input-bordered w-full" placeholder="Name" required />
+  <textarea name="description" class="mt-3 w-full textarea textarea-bordered min-h-32" placeholder="Description" required></textarea>
+  <textarea name="first_message" class="mt-3 w-full textarea textarea-bordered min-h-32" placeholder="First Message" required></textarea>
+  <textarea name="system_message" class="mt-3 w-full textarea textarea-bordered min-h-32" placeholder="System Message" required></textarea>
+  <button type="submit" class="mt-5 w-full btn btn-neutral">Submit</button>
+</form>

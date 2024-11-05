@@ -10,9 +10,8 @@ use native_db::*;
 use native_model::{native_model, Model};
 use once_cell::sync::Lazy;
 
-use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
-use std::path::{self, Path};
+use std::fs::{self, OpenOptions};
+use std::path::Path;
 
 struct AppState {
     http_client: Client,
@@ -66,6 +65,16 @@ struct Settings {
     #[primary_key]
     id: String,
     link: String,
+    temp: f32,
+    top_p: f32,
+    top_k: f32,
+    min_p: f32,
+    typical_p: f32,
+    repeat_penalty: f32,
+    tfs_z: f32,
+    mirostat_mode: f32,
+    mirostat_tau: f32,
+    mirostat_eta: f32,
 }
 
 static MODELS: Lazy<Models> = Lazy::new(|| {
@@ -75,6 +84,9 @@ static MODELS: Lazy<Models> = Lazy::new(|| {
     models.define::<Settings>().unwrap();
     models
 });
+
+// might be causing issues with saving settings.
+static SETTINGS_ID: &'static str = "123"; 
 
 // everything returned from commands must implement serde::Serialize
 
@@ -177,7 +189,7 @@ async fn add_conversation(
 
     let settings: Settings = transaction
         .get()
-        .primary(String::from("123"))
+        .primary(String::from(SETTINGS_ID))
         .map_err(|err| err.to_string())?
         .ok_or_else(|| String::from("Settings does not exist."))?;
     let url = format!("http://{}/create", settings.link);
@@ -323,14 +335,41 @@ fn delete_character(state: State<'_, Mutex<AppState>>, id: String) -> Result<(),
 /////////////////// ESSENTIALS //////////////////
 
 #[tauri::command]
-fn change_link(link: String, state: State<'_, Mutex<AppState>>) -> Result<(), String> {
+fn change_settings(
+    state: State<'_, Mutex<AppState>>,
+    link: String,
+    temp: f32,
+    top_p: f32,
+    top_k: f32,
+    min_p: f32,
+    typical_p: f32,
+    repeat_penalty: f32,
+    tfs_z: f32,
+    mirostat_mode: f32,
+    mirostat_tau: f32,
+    mirostat_eta: f32,
+) -> Result<(), String> {
+    let settings = Settings {
+        id: String::from(SETTINGS_ID),
+        link,
+        temp,
+        top_p,
+        top_k,
+        min_p,
+        typical_p,
+        repeat_penalty,
+        tfs_z,
+        mirostat_mode,
+        mirostat_tau,
+        mirostat_eta,
+    };
     let state = state.blocking_lock();
     let transaction = state
         .db
         .rw_transaction()
         .map_err(|err| err.to_string())?;
     transaction
-        .upsert(Settings { id: String::from("123"), link })
+        .upsert(settings)
         .map_err(|err| err.to_string())?;
     transaction.commit().map_err(|err| err.to_string())?;
 
@@ -346,7 +385,7 @@ fn grab_link(state: State<'_, Mutex<AppState>>) -> Result<String, String> {
         .map_err(|err| err.to_string())?;
     let settings: Settings = transaction
         .get()
-        .primary(String::from("123"))
+        .primary(String::from(SETTINGS_ID))
         .map_err(|err| err.to_string())?
         .ok_or_else(|| String::from("Settings does not exist."))?;
 
@@ -354,9 +393,25 @@ fn grab_link(state: State<'_, Mutex<AppState>>) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn grab_settings(state: State<'_, Mutex<AppState>>) -> Result<Settings, String> {
+    let state = state.blocking_lock();
+    let transaction = state
+        .db
+        .r_transaction()
+        .map_err(|err| err.to_string())?;
+    let settings: Settings = transaction
+        .get()
+        .primary(String::from(SETTINGS_ID))
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| String::from("Settings does not exist."))?;
+
+    Ok(settings)
+}
+
+#[tauri::command]
 async fn create_ai_message(
-    conversationjson: &str,
     state: State<'_, Mutex<AppState>>,
+    conversationjson: &str,
 ) -> Result<String, String> {
     let state = state.lock().await;
     let transaction = state
@@ -365,7 +420,7 @@ async fn create_ai_message(
         .map_err(|err| err.to_string())?;
     let settings: Settings = transaction
         .get()
-        .primary(String::from("123"))
+        .primary(String::from(SETTINGS_ID))
         .map_err(|err| err.to_string())?
         .ok_or_else(|| String::from("Settings does not exist."))?;
 
@@ -441,7 +496,8 @@ pub fn run() {
         })
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
-            change_link,
+            change_settings,
+            grab_settings,
             grab_link,
             create_ai_message,
             grab_character,

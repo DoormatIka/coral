@@ -22,7 +22,7 @@
 
     <div class="card-actions justify-end z-50 w-full">
       <button class="btn btn-primary btn-sm" onclick={async () => { await removeCharacter() }} aria-label="close">
-        Remove
+        <iconify-icon icon="basil:cross-outline" class="text-2xl"></iconify-icon>
       </button>
     </div>
     <a class="p-3 h-full" href={link} data-sveltekit-preload-data="off">

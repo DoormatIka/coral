@@ -17,14 +17,6 @@
     "https://cdn.discordapp.com/attachments/914427100935647245/1298618003021365309/FB_IMG_1729685032217.jpg?ex=671ae083&is=67198f03&hm=6587407ef9e9f3e65999552e0130877fa3e3b9e441941c3f73666066ce3276be&",
   ];
 
-  function showIPModal() {
-    const my_modal_2 = document.getElementById("my_modal_2")! as any;
-    my_modal_2.showModal();
-  }
-  // getLink function...
-  async function changeLink() {
-    await invoke("change_link", { link: current_link });
-  }
   async function linkSanityCheck() {
     try {
       await fetch("http://" + current_link + "/ping", {
@@ -57,34 +49,9 @@
             <iconify-icon icon="weui:back-filled" class="text-3xl py-3" style="vertical-align: -0.125em;"></iconify-icon>
           </a>
         {:else}
-          <button onclick={showIPModal} aria-label="id">
-            <iconify-icon icon="mdi:ip" class="text-3xl py-3" style="vertical-align: -0.125em;"></iconify-icon>
-          </button>
           <button onclick={linkSanityCheck} class="btn btn-outline">Sanity Check: {isOnline ? "Sane" : "Insane"}</button>
         {/if}
       </div>
-
-      <!-- Link Modal -->
-      <dialog id="my_modal_2" class="modal overflow-hidden">
-        <div class="modal-box bg-base-200">
-          <form method="dialog" class="sm:block hidden">
-            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">X</button>
-          </form>
-          <h3 class="text-2xl font-bold mb-3">Set your IP here.</h3>
-          <label class="input input-bordered flex items-center gap-2">
-            <iconify-icon icon="mdi:ip" class="text-3xl" style="vertical-align: -0.125em;"></iconify-icon>
-            <input bind:value={current_link} type="text" placeholder="127.0.0.1" />
-          </label>
-
-          <form method="dialog">
-            <button class="bg-neutral btn p-3 w-full mt-2" onclick={changeLink}>Set</button>
-          </form>
-        </div>
-        <form method="dialog" class="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
-
       <!-- Page content here -->
       <slot />
 
@@ -93,7 +60,7 @@
     <!-- Drawer -->
     <div class="drawer-side z-50">
       <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label>
-      <div class="p-5 min-h-full bg-base-100 border-r border-neutral">
+      <div class="p-5 h-full bg-base-100 border-r border-neutral flex flex-col">
 
         <!-- Side bar. -->
         <h1>Coral</h1>
@@ -108,7 +75,9 @@
           {/each}
         </div>
         <br>
-        <a href="/create" class="btn w-full">Create</a>
+
+        <a href="/create" class="btn w-full mt-3">Create</a>
+        <a href="/settings" class="btn w-full mt-3">Settings</a>
 
       </div>
     </div>

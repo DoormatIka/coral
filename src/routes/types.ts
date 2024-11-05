@@ -21,3 +21,20 @@ export type MessageRequest = {
 		log: Message[],
 		regen: boolean,
 }
+export type Settings = {
+    id: string,
+    link: string,
+    temp: number,
+    top_p: number,
+    top_k: number,
+    min_p: number,
+    typical_p: number,
+    repeat_penalty: number,
+    tfs_z: number,
+    mirostat_mode: number,
+    mirostat_tau: number,
+    mirostat_eta: number,
+}
+
+
+
