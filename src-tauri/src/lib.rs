@@ -1,3 +1,4 @@
+use transaction::RwTransaction;
 use uuid::Uuid;
 
 use tauri::async_runtime::Mutex;
@@ -58,7 +59,7 @@ struct CharacterConversation {
     log: Vec<Message>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[native_model(id = 3, version = 1)]
 #[native_db]
 struct Settings {
@@ -84,9 +85,6 @@ static MODELS: Lazy<Models> = Lazy::new(|| {
     models.define::<Settings>().unwrap();
     models
 });
-
-// might be causing issues with saving settings.
-static SETTINGS_ID: &'static str = "123"; 
 
 // everything returned from commands must implement serde::Serialize
 
@@ -187,11 +185,8 @@ async fn add_conversation(
         content: char.first_message,
     });
 
-    let settings: Settings = transaction
-        .get()
-        .primary(String::from(SETTINGS_ID))
-        .map_err(|err| err.to_string())?
-        .ok_or_else(|| String::from("Settings does not exist."))?;
+    let settings = get_maybe_settings(&transaction);
+
     let url = format!("http://{}/create", settings.link);
     let new_memory_id = state
         .http_client
@@ -350,7 +345,7 @@ fn change_settings(
     mirostat_eta: f32,
 ) -> Result<(), String> {
     let settings = Settings {
-        id: String::from(SETTINGS_ID),
+        id: String::from("123"),
         link,
         temp,
         top_p,
@@ -376,20 +371,38 @@ fn change_settings(
     Ok(())
 }
 
-#[tauri::command]
-fn grab_link(state: State<'_, Mutex<AppState>>) -> Result<String, String> {
-    let state = state.blocking_lock();
-    let transaction = state
-        .db
-        .r_transaction()
-        .map_err(|err| err.to_string())?;
-    let settings: Settings = transaction
+fn get_maybe_settings(transaction: &RwTransaction<'_>) -> Settings {
+    let settings: Option<Settings> = transaction
         .get()
-        .primary(String::from(SETTINGS_ID))
-        .map_err(|err| err.to_string())?
-        .ok_or_else(|| String::from("Settings does not exist."))?;
+        .primary(String::from("123"))
+        .unwrap_or_else(|err| {
+            match err {
+                native_db::db_type::Error::ModelError(_) => {
+                    let mut settings = Settings::default();
+                    settings.id = String::from("123");
+                    transaction.insert(settings.clone()).unwrap();
+                    println!("{:?}", err);
 
-    Ok(settings.link)
+                    Some(settings)
+                }
+                _ => {
+                    println!("{:?}", err);
+                    None
+                },
+            }
+        });
+    let settings = match settings {
+        Some(settings) => settings,
+        None => {
+            let mut settings = Settings::default();
+            settings.id = String::from("123");
+            transaction.insert(settings.clone()).unwrap();
+
+            settings
+        }
+    };
+
+    settings
 }
 
 #[tauri::command]
@@ -397,13 +410,10 @@ fn grab_settings(state: State<'_, Mutex<AppState>>) -> Result<Settings, String> 
     let state = state.blocking_lock();
     let transaction = state
         .db
-        .r_transaction()
+        .rw_transaction()
         .map_err(|err| err.to_string())?;
-    let settings: Settings = transaction
-        .get()
-        .primary(String::from(SETTINGS_ID))
-        .map_err(|err| err.to_string())?
-        .ok_or_else(|| String::from("Settings does not exist."))?;
+    let settings = get_maybe_settings(&transaction);
+    transaction.commit().map_err(|err| err.to_string()).unwrap();
 
     Ok(settings)
 }
@@ -416,13 +426,11 @@ async fn create_ai_message(
     let state = state.lock().await;
     let transaction = state
         .db
-        .r_transaction()
+        .rw_transaction()
         .map_err(|err| err.to_string())?;
-    let settings: Settings = transaction
-        .get()
-        .primary(String::from(SETTINGS_ID))
-        .map_err(|err| err.to_string())?
-        .ok_or_else(|| String::from("Settings does not exist."))?;
+
+    let settings = get_maybe_settings(&transaction);
+    transaction.commit().map_err(|err| err.to_string())?;
 
     let url = format!("http://{}/complete", settings.link);
     let res = state
@@ -498,7 +506,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             change_settings,
             grab_settings,
-            grab_link,
             create_ai_message,
             grab_character,
             grab_character_list,

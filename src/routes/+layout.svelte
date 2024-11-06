@@ -3,13 +3,9 @@
   import Avatar from "$lib/Avatar.svelte";
   import { page } from "$app/stores";
   import { invoke } from "@tauri-apps/api/core";
-  import { onMount } from "svelte";
+  import type { Settings } from "./types";
 
   let isOnline = $state(true);
-  let current_link = $state("");
-  onMount(async () => {
-    current_link = await invoke("grab_link");
-  })
 
   const avatars = [
     "https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp",
@@ -19,6 +15,8 @@
 
   async function linkSanityCheck() {
     try {
+      const settings: Settings = await invoke("grab_settings");
+      const current_link = settings.link;
       await fetch("http://" + current_link + "/ping", {
         method: "GET",
         mode: "no-cors",
