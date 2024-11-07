@@ -10,21 +10,26 @@
   const form_entries = [
     "link",
     "temp",
-    "topP",
-    "topK",
-    "minP",
-    "typicalP",
-    "repeatPenalty",
-    "tfsZ",
-    "mirostatMode",
-    "mirostatTau",
-    "mirostatEta"
+    "top_p",
+    "top_k",
+    "min_p",
+    "typical_p",
+    "repeat_penalty",
+    "tfs_z",
+    "mirostat_mode",
+    "mirostat_tau",
+    "mirostat_eta"
   ];
   onMount(() => {
     const filtered_data = Object.entries(data.settings).filter(element => form_entries.includes(element[0]));
     for (let i = 0; i < filtered_data.length; i++) {
-      const element = document.getElementsByName(filtered_data[i][0])[0] as HTMLInputElement;
-      element.value = filtered_data[i][1].toString();
+      if (filtered_data[i][0] === "mirostat_mode") {
+        const element = document.getElementsByName(filtered_data[i][0])[0] as HTMLSelectElement;
+        element.selectedIndex = Number(filtered_data[i][1]);
+      } else {
+        const element = document.getElementsByName(filtered_data[i][0])[0] as HTMLInputElement;
+        element.value = filtered_data[i][1].toString();
+      }
     }
   });
 
@@ -36,15 +41,24 @@
     const filtered_data = data.entries().filter(element => form_entries.includes(element[0])).toArray();
     const args = new Map<string, string | number>()
     for (let i = 0; i < filtered_data.length; i++) {
+      // snakeToCamel due to tauri not recognizing snake_case variables.
+      const name = snakeToCamel(filtered_data[i][0]);
       const data = filtered_data[i][1].toString();
       const try_conversion = Number(filtered_data[i][1].toString());
 
-      if (filtered_data[i][0] === "link" || isNaN(try_conversion)) {
-        args.set(filtered_data[i][0], data);
-      } else {
-        args.set(filtered_data[i][0], try_conversion);
+      if (name === "link") {
+        args.set(name, data);
+        continue;
       }
-
+      if (name === "mirostatMode") {
+        args.set(name, mirostatModeToNumber(data));
+        continue;
+      }
+      if (isNaN(try_conversion)) {
+        args.set(name, data);
+      } else {
+        args.set(name, try_conversion);
+      }
     }
 
     try {
@@ -54,24 +68,78 @@
       err = inerr as string;
     }
   }
+  function mirostatModeToNumber(text: string) {
+    switch (text) {
+      case "Disabled":
+        return 0;
+      case "Mirostat":
+        return 1;
+      case "Mirostat 2.0":
+        return 2;
+      default:
+        return 0;
+    }
+  }
+  function snakeToCamel(str: string) {
+    return str.toLowerCase().replace(/([-_][a-z])/g, group =>
+      group
+        .toUpperCase()
+        .replace('-', '')
+      .replace('_', '')
+    )
+  }
 
+  let isOnline = $state(true);
+  let inProgress = $state(false);
+  async function linkSanityCheck() {
+    const element = document.getElementsByName("link")[0] as HTMLInputElement;
+    inProgress = true;
+    try {
+      await invoke("sanity_check", { link: element.value });
+      isOnline = true;
+    } catch (err) {
+      isOnline = false;
+    }
+    inProgress = false;
+  }
 </script>
 
 <div class="h-full overflow-y-auto p-5">
   <h2 class="text-4xl">Settings</h2>
   <form onsubmit={setSettingsToDatabase} class="py-3 gap-3 flex flex-col lg:grid lg:grid-cols-2">
 
-    <Input label="Link" name="link" type="text" placeholder="127.0.0.1"></Input>
-    <Input label="Temp" name="temp" type="number" placeholder="0.1"></Input>
-    <Input label="Top p" name="topP" type="number" placeholder="0.1"></Input>
-    <Input label="Top k" name="topK" type="number" placeholder="0.1"></Input>
-    <Input label="Min p" name="minP" type="number" placeholder="0.1"></Input>
-    <Input label="Typical p" name="typicalP" type="number" placeholder="0.1"></Input>
-    <Input label="Repeat Penalty" name="repeatPenalty" type="number" placeholder="0.1"></Input>
-    <Input label="tfs_z" name="tfsZ" type="number" placeholder="0.1"></Input>
-    <Input label="Mirostat Mode" name="mirostatMode" type="number" placeholder="0.1"></Input>
-    <Input label="Mirostat Tau" name="mirostatTau" type="number" placeholder="0.1"></Input>
-    <Input label="Mirostat Eta" name="mirostatEta" type="number" placeholder="0.1"></Input>
+    <Input label="Link" name="link" type="text" placeholder="127.0.0.1">
+      <button onclick={linkSanityCheck} class="ml-3 btn btn-outline" type="button">
+        {#if inProgress}
+          <span class="loading loading-spinner loading-sm"></span>
+        {:else}
+          {#if isOnline}
+            <iconify-icon class="text-xl" icon="mdi:check-bold"></iconify-icon>
+          {:else}
+            <iconify-icon class="text-xl" icon="maki:cross"></iconify-icon>
+          {/if}
+        {/if}
+      </button>
+    </Input>
+
+    <Input label="Temp" name="temp" type="number" step="0.01" placeholder="0.1"></Input>
+    <Input label="Top p" name="top_p" type="number" step="0.01" placeholder="0.1"></Input>
+    <Input label="Top k" name="top_k" type="number" step="1" placeholder="40"></Input>
+    <Input label="Min p" name="min_p" type="number" step="0.001" placeholder="0.1"></Input>
+    <Input label="Typical p" name="typical_p" type="number" step="0.01" placeholder="0.1"></Input>
+    <Input label="Repeat Penalty" name="repeat_penalty" type="number" step="0.01" placeholder="0.1"></Input>
+    <Input label="tfs_z" name="tfs_z" type="number" step="0.01" placeholder="0.1"></Input>
+
+    <br>
+
+    <h2>Mirostat</h2>
+    <select class="select select-bordered w-full" name="mirostat_mode">
+      <option selected>Disabled</option>
+      <option>Mirostat</option>
+      <option>Mirostat 2.0</option>
+    </select>
+    <Input label="Mirostat Tau" name="mirostat_tau" type="number" step="0.01" placeholder="0.1"></Input>
+    <Input label="Mirostat Eta" name="mirostat_eta" type="number" step="0.01" placeholder="0.1"></Input>
 
     {#if err.length > 0}
       <p class="text-error">Error: {err}</p>

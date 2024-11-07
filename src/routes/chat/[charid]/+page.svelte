@@ -19,7 +19,6 @@
 
 
   // user input stuff
-  
   let user_input = $state("");
   function showEditModal() {
     const my_modal_2 = document.getElementById("editmodal")! as any;
@@ -28,17 +27,20 @@
 
   let selected_message: number = $state(0);
   let user_edit_msg: string = $state("");
-  function editMessage() {
+  async function editMessage() {
     const previous_message = chats[selected_message];
     chats[selected_message] = structuredClone({person: previous_message.person, content: user_edit_msg});
     selected_message = 0;
     user_edit_msg = "";
+
+    await invoke("update_conversation_log", {chatId: data.conversation.id, log: chats}).catch((err) => { user_input = err as string; });
   }
 
   async function regenMessage(index: number) {
     const user_msg = chats.splice(index)[0];
     await sendMessage(user_msg.content, true);
   }
+
   function trimMessages(chats: Message[], len: number = 20): { log: Message[], memories: Message[] } {
     const system_prompt = chats[0];
     const user_messages = chats.slice(1);
@@ -88,7 +90,7 @@
 
       sendbutton.disabled = true;
       try {
-        const rawMsg: string = await invoke("create_ai_message", {conversationjson: JSON.stringify(apisend)});
+        const rawMsg: string = await invoke("create_ai_message", {conversation: apisend});
         const msg: {message: string} = JSON.parse(rawMsg);
         chats.push({ person: "assistant", content: msg.message.trim()});
       } catch (err) {
@@ -128,9 +130,18 @@
       <div class="w-full" transition:fly={{ duration: 400, x: -200 }}>
 
         {#if msg.person === "system"}
-          <div class="chat flex justify-center items-center">
-            <div class="chat-bubble whitespace-pre-line">{msg.content}</div>
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <div class="dropdown dropdown-bottom w-full">
+            <div class="chat flex justify-center items-center pt-5">
+
+              <div role="button" tabindex="0" class="chat-bubble whitespace-pre-line">{msg.content}</div>
+              <div tabindex="0" class="dropdown-content bg-base-100 rounded-box z-[1] w-fit shadow">
+                <button class="p-3" onclick={() => { selected_message = index; user_edit_msg = msg.content; showEditModal(); }}>Edit</button>
+              </div>
+
+            </div>
           </div>
+          <div class="divider h-2"></div>
         {/if}
         {#if msg.person === "assistant"}
           <!-- svelte-ignore a11y_no_noninteractive_tabindex -->

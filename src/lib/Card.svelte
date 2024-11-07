@@ -21,7 +21,7 @@
   <div class="card-body min-w-full h-full p-3">
 
     <div class="card-actions justify-end z-50 w-full">
-      <button class="btn btn-primary btn-sm" onclick={async () => { await removeCharacter() }} aria-label="close">
+      <button class="btn btn-square btn-ghost btn-sm" onclick={async () => { await removeCharacter() }} aria-label="close">
         <iconify-icon icon="basil:cross-outline" class="text-2xl"></iconify-icon>
       </button>
     </div>

@@ -1,3 +1,4 @@
+use serde_json::json;
 use transaction::RwTransaction;
 use uuid::Uuid;
 
@@ -5,6 +6,7 @@ use tauri::async_runtime::Mutex;
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_repr::*;
 use tauri::{Manager, State};
 
 use native_db::*;
@@ -68,14 +70,31 @@ struct Settings {
     link: String,
     temp: f32,
     top_p: f32,
-    top_k: f32,
+    top_k: u32, // should not be negative.
     min_p: f32,
     typical_p: f32,
     repeat_penalty: f32,
     tfs_z: f32,
-    mirostat_mode: f32,
+    mirostat_mode: MirostatMode, // this should be 0 = disabled, 1 = mirostat, 2 = mirostat 2.0
     mirostat_tau: f32,
     mirostat_eta: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct MessagePayload {
+    memory_id: String,
+    memories: Vec<Message>,
+    log: Vec<Message>,
+    regen: bool,
+}
+
+#[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Default)]
+#[repr(u8)]
+enum MirostatMode {
+    #[default]
+    Disabled = 0,
+    Mirostat = 1,
+    MirostatPlus = 2,
 }
 
 static MODELS: Lazy<Models> = Lazy::new(|| {
@@ -335,12 +354,12 @@ fn change_settings(
     link: String,
     temp: f32,
     top_p: f32,
-    top_k: f32,
+    top_k: u32,
     min_p: f32,
     typical_p: f32,
     repeat_penalty: f32,
     tfs_z: f32,
-    mirostat_mode: f32,
+    mirostat_mode: MirostatMode,
     mirostat_tau: f32,
     mirostat_eta: f32,
 ) -> Result<(), String> {
@@ -381,12 +400,10 @@ fn get_maybe_settings(transaction: &RwTransaction<'_>) -> Settings {
                     let mut settings = Settings::default();
                     settings.id = String::from("123");
                     transaction.insert(settings.clone()).unwrap();
-                    println!("{:?}", err);
 
                     Some(settings)
                 }
                 _ => {
-                    println!("{:?}", err);
                     None
                 },
             }
@@ -418,10 +435,28 @@ fn grab_settings(state: State<'_, Mutex<AppState>>) -> Result<Settings, String> 
     Ok(settings)
 }
 
+#[tauri::command] // not added yet
+async fn sanity_check(state: State<'_, Mutex<AppState>>, link: String) -> Result<String, String> {
+    let state = state.lock().await;
+
+    let url = format!("http://{}/ping", link);
+    let res = state
+        .http_client
+        .get(url)
+        .send()
+        .await
+        .map_err(|err| err.to_string())?
+        .text()
+        .await
+        .map_err(|err| err.to_string())?;
+
+    Ok(res)
+}
+
 #[tauri::command]
 async fn create_ai_message(
     state: State<'_, Mutex<AppState>>,
-    conversationjson: &str,
+    conversation: MessagePayload,
 ) -> Result<String, String> {
     let state = state.lock().await;
     let transaction = state
@@ -431,12 +466,17 @@ async fn create_ai_message(
 
     let settings = get_maybe_settings(&transaction);
     transaction.commit().map_err(|err| err.to_string())?;
+    let json_string = json!({
+        "conversation": conversation,
+        "settings": settings,
+        "seed": rand::random::<i32>(),
+    });
 
     let url = format!("http://{}/complete", settings.link);
     let res = state
         .http_client
         .post(url)
-        .body(conversationjson.to_string())
+        .body(json_string.to_string())
         .header("Content-Type", "application/json")
         .send()
         .await
@@ -504,6 +544,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
+            sanity_check,
             change_settings,
             grab_settings,
             create_ai_message,

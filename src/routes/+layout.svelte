@@ -2,31 +2,12 @@
   import "../app.css";
   import Avatar from "$lib/Avatar.svelte";
   import { page } from "$app/stores";
-  import { invoke } from "@tauri-apps/api/core";
-  import type { Settings } from "./types";
-
-  let isOnline = $state(true);
 
   const avatars = [
     "https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp",
     "https://cdn.discordapp.com/attachments/914427100935647245/1298626589063381073/image.png?ex=671ae882&is=67199702&hm=09d4844da579a73b73180d3fa1b3f8b2fa93cbcf32c57f0ce17202e2ae21bcc9&",
     "https://cdn.discordapp.com/attachments/914427100935647245/1298618003021365309/FB_IMG_1729685032217.jpg?ex=671ae083&is=67198f03&hm=6587407ef9e9f3e65999552e0130877fa3e3b9e441941c3f73666066ce3276be&",
   ];
-
-  async function linkSanityCheck() {
-    try {
-      const settings: Settings = await invoke("grab_settings");
-      const current_link = settings.link;
-      await fetch("http://" + current_link + "/ping", {
-        method: "GET",
-        mode: "no-cors",
-      });
-      isOnline = true;
-    } catch (err) {
-      isOnline = false;
-    }
-  }
-
 </script>
 
 
@@ -46,8 +27,6 @@
           <a href="/" class="flex items-center px-3" aria-label="Home">
             <iconify-icon icon="weui:back-filled" class="text-3xl py-3" style="vertical-align: -0.125em;"></iconify-icon>
           </a>
-        {:else}
-          <button onclick={linkSanityCheck} class="btn btn-outline">Sanity Check: {isOnline ? "Sane" : "Insane"}</button>
         {/if}
       </div>
       <!-- Page content here -->
@@ -76,6 +55,7 @@
 
         <a href="/create" class="btn w-full mt-3">Create</a>
         <a href="/settings" class="btn w-full mt-3">Settings</a>
+        <a href="/chat/conversations" class="btn w-full mt-3">Conversations</a>
 
       </div>
     </div>
