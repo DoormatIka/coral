@@ -29,7 +29,7 @@
               title={char.name} 
               description={char.description} 
               image_link={image_link} 
-              link="/chat/{char.id}"
+              link="/chat/characters/{char.id}"
               removeCharacter={async () => {
                 await invoke("delete_character", {id: char.id}) 
                 await getCharacters();

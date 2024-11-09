@@ -55,7 +55,6 @@
 
         <a href="/create" class="btn w-full mt-3">Create</a>
         <a href="/settings" class="btn w-full mt-3">Settings</a>
-        <a href="/chat/conversations" class="btn w-full mt-3">Conversations</a>
 
       </div>
     </div>

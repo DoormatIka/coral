@@ -61,7 +61,7 @@ struct CharacterConversation {
     log: Vec<Message>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[native_model(id = 3, version = 1)]
 #[native_db]
 struct Settings {
@@ -78,6 +78,24 @@ struct Settings {
     mirostat_mode: MirostatMode, // this should be 0 = disabled, 1 = mirostat, 2 = mirostat 2.0
     mirostat_tau: f32,
     mirostat_eta: f32,
+}
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            id: String::from("123"),
+            link: String::new(),
+            temp: 1.0,
+            top_p: 1.2,
+            top_k: 40,
+            min_p: 0.075,
+            typical_p: 1.0,
+            repeat_penalty: 1.1,
+            tfs_z: 1.0,
+            mirostat_mode: MirostatMode::Disabled,
+            mirostat_tau: 3.0,
+            mirostat_eta: 0.15,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -544,19 +562,24 @@ pub fn run() {
         })
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
-            sanity_check,
+            // message
+            create_ai_message,
+            // settings
             change_settings,
             grab_settings,
-            create_ai_message,
-            grab_character,
-            grab_character_list,
+            // conversations
+            add_conversation,
             grab_conversation,
             grab_conversation_list,
+            update_conversation_log,
+            // characters
             add_character,
             delete_character,
             update_character,
-            add_conversation,
-            update_conversation_log,
+            grab_character,
+            grab_character_list,
+            // misc
+            sanity_check,
             clear_all,
         ])
         .run(tauri::generate_context!())

@@ -25,20 +25,28 @@
     my_modal_2.showModal();
   }
 
+
   let selected_message: number = $state(0);
   let user_edit_msg: string = $state("");
+
   async function editMessage() {
     const previous_message = chats[selected_message];
     chats[selected_message] = structuredClone({person: previous_message.person, content: user_edit_msg});
     selected_message = 0;
     user_edit_msg = "";
 
-    await invoke("update_conversation_log", {chatId: data.conversation.id, log: chats}).catch((err) => { user_input = err as string; });
+    invoke("update_conversation_log", {chatId: data.conversation.id, log: chats})
+      .catch((err) => { user_input = err as string; });
   }
 
   async function regenMessage(index: number) {
     const user_msg = chats.splice(index)[0];
-    await sendMessage(user_msg.content, true);
+    sendMessage(user_msg.content, true);
+  }
+  async function deleteMessage(index: number) {
+    chats.splice(index)[0];
+    invoke("update_conversation_log", {chatId: data.conversation.id, log: chats})
+      .catch((err) => { user_input = err as string; });
   }
 
   function trimMessages(chats: Message[], len: number = 20): { log: Message[], memories: Message[] } {
@@ -73,7 +81,7 @@
     };
   }
   
-  async function sendMessage(message: string, regen: boolean) {
+  function sendMessage(message: string, regen: boolean) {
     if (message.trim() !== "") {
       chats.push({person: "user", content: structuredClone(message)});
 
@@ -89,18 +97,24 @@
       setTimeout(() => { chatelement.scrollBy({top: 99999, behavior: "smooth"}) }, 100);
 
       sendbutton.disabled = true;
-      try {
-        const rawMsg: string = await invoke("create_ai_message", {conversation: apisend});
-        const msg: {message: string} = JSON.parse(rawMsg);
-        chats.push({ person: "assistant", content: msg.message.trim()});
-      } catch (err) {
-        chats.pop();
-        user_input = err as string;
-      }
-      sendbutton.disabled = false;
-      await invoke("update_conversation_log", {chatId: data.conversation.id, log: chats}).catch((err) => { user_input = err as string; });
+      invoke("create_ai_message", {conversation: apisend})
+        .then((v: unknown) => {
+          const rawMsg: string = v as string;
+          const msg: {message: string} = JSON.parse(rawMsg);
+          chats.push({ person: "assistant", content: msg.message.trim()});
 
-      setTimeout(() => { chatelement.scrollBy({top: 99999, behavior: "smooth"}) }, 100);
+          invoke("update_conversation_log", {chatId: data.conversation.id, log: chats})
+            .then(() => setTimeout(() => { chatelement.scrollBy({top: 99999, behavior: "smooth"}) }, 100))
+            .catch((err) => { user_input = err as string; });
+        })
+        .catch((err) => {
+          chats.pop();
+          user_input = err as string;
+        })
+        .finally(() => {
+          sendbutton.disabled = false;
+        });
+
     }
   }
 </script>
@@ -136,7 +150,11 @@
 
               <div role="button" tabindex="0" class="chat-bubble whitespace-pre-line">{msg.content}</div>
               <div tabindex="0" class="dropdown-content bg-base-100 rounded-box z-[1] w-fit shadow">
-                <button class="p-3" onclick={() => { selected_message = index; user_edit_msg = msg.content; showEditModal(); }}>Edit</button>
+                <button class="p-3" onclick={() => {
+                  selected_message = index;
+                  user_edit_msg = msg.content;
+                  showEditModal();
+                }}>Edit</button>
               </div>
 
             </div>
@@ -147,10 +165,16 @@
           <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
           <div class="dropdown dropdown-bottom w-full">
             <div class="chat chat-start">
+
               <div role="button" tabindex="0" class="chat-bubble relative whitespace-pre-line">{msg.content}</div>
               <div tabindex="0" class="dropdown-content bg-base-100 rounded-box z-[1] w-fit shadow">
-                <button class="p-3" onclick={() => { selected_message = index; user_edit_msg = msg.content; showEditModal(); }}>Edit</button>
+                <button class="p-3" onclick={() => {
+                  selected_message = index;
+                  user_edit_msg = msg.content;
+                  showEditModal();
+                }}>Edit</button>
               </div>
+
             </div>
           </div>
         {/if}
@@ -161,7 +185,7 @@
             <div class="chat chat-end">
               <div role="button" tabindex="0" class="chat-bubble relative whitespace-pre-line">{msg.content}</div>
               <div tabindex="0" class="dropdown-content bg-base-100 rounded-box z-[1] w-fit shadow">
-                <button class="p-3" onclick={() => {chats.splice(index)}}>Delete</button>
+                <button class="p-3" onclick={() => {deleteMessage(index)}}>Delete</button>
                 <button class="p-3" onclick={() => {regenMessage(index)}}>Regen</button>
               </div>
             </div>
@@ -174,7 +198,7 @@
 
   <div class="flex w-full items-center">
     <textarea class="textarea resize-none w-full" placeholder="Send a message..." bind:value={user_input}></textarea>
-      <button class="btn h-full" id="sendbutton" onclick={() => {sendMessage(user_input, false)}} aria-label="Send Message">
+    <button class="btn h-full" id="sendbutton" onclick={() => sendMessage(user_input, false)} aria-label="Send Message">
       <iconify-icon icon="mynaui:send" class="text-3xl"></iconify-icon>
     </button>
   </div>
