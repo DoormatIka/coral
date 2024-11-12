@@ -18,11 +18,20 @@
   let error: string = $state("");
   function addConversation() {
     invoke("add_conversation", { "charId": charid })
+      .then(() => {
+        invoke<CharacterConversation[]>("grab_conversation_list", {"charId": charid})
+          .then((c) => { conversations = c; })
+          .catch((err) => error = err);
+      })
       .catch((err) => error = err);
-    invoke("grab_conversation_list", {"charId": charid})
-      .then((c) => {
-        const r = c as CharacterConversation[];
-        conversations = r;
+  }
+
+  function removeConversation(id: string) {
+    invoke("delete_conversation", { "id": id })
+      .then(() => {
+        invoke<CharacterConversation[]>("grab_conversation_list", {"charId": charid})
+          .then((c) => { conversations = c; })
+          .catch((err) => error = err);
       })
       .catch((err) => error = err);
   }
@@ -50,18 +59,25 @@
     </div>
   </div>
 
-
   <br>
 
   <div class="w-full h-full flex flex-col items-center">
 
     <div class="w-full max-w-3xl flex flex-col justify-center join join-vertical gap-2 pb-10">
       {#each conversations as conversation, index (conversation["id"])}
-        <a data-sveltekit-preload-data="off" href="/chat/{conversation.id}" class="join-item border border-sm border-neutral hover:bg-neutral transition-colors p-5 max-h-20 truncate text-ellipsis">
-          C{index + 1}: {conversation.log.at(-1)!.content}
-        </a>
+        <div class="join-item flex items-center border border-sm border-neutral hover:bg-neutral transition-colors px-5 max-h-20">
+
+          <a data-sveltekit-preload-data="off" href="/chat/{conversation.id}" class="py-5 flex-1 truncate text-ellipsis">
+            #{index + 1}: {conversation.log.at(-1)!.content}
+          </a>
+
+          <button class="btn btn-square btn-ghost btn-sm" style="vertical-align: -0.125em" onclick={() => {removeConversation(conversation.id)}} aria-label="close">
+            <iconify-icon icon="basil:cross-outline" class="text-3xl"></iconify-icon>
+          </button>
+
+        </div>
       {/each}
-      <button class="btn btn-outline btn-default join-item" onclick={() => addConversation()} aria-label="addConversation">
+      <button class="btn btn-outline join-item" onclick={() => addConversation()} aria-label="addConversation">
         <iconify-icon class="text-3xl" icon="mdi:plus"></iconify-icon>
       </button>
     </div>

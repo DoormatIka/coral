@@ -1,11 +1,27 @@
 
 <script lang="ts">
+  import {convertFileSrc} from "@tauri-apps/api/core";
+  import {open} from "@tauri-apps/plugin-dialog";
   import {goto} from "$app/navigation";
   import {invoke} from "@tauri-apps/api/core";
 
+  let selected_image: string | null = null;
   let err: string = "";
   function showErrorModal() {
     (document.getElementById("errormodal")! as any).showModal();
+  }
+  async function openDialog() {
+    const file = await open({
+      multiple: false,
+      directory: false,
+      filters: [{
+        name: 'Image',
+        extensions: ['png', 'jpeg']
+      }],
+    });
+    if (!file) { return; }
+    selected_image = convertFileSrc(file);
+    console.log(selected_image);
   }
 
   async function addCharacterToDatabase(event: Event) {
@@ -47,7 +63,17 @@
 </dialog>
 
 <form onsubmit={addCharacterToDatabase} class="h-full w-full p-5 overflow-y-auto m-auto">
-  <h2>Create Character</h2>
+  <h2 class="text-4xl py-3">Create Character</h2>
+
+  <div class="flex flex-col justify-center items-center gap-2 join join-vertical">
+    <div class="avatar join-item">
+      <div class="w-32 join-item">
+        <img src={selected_image ?? "https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp"} alt="nagakuuu" />
+      </div>
+    </div>
+    <button type="button" onclick={openDialog} class="btn-outline btn rounded w-32 join-item">Select Avatar</button>
+  </div>
+
   <input type="text" name="name" class="mt-3 input input-bordered w-full" placeholder="Name" required />
   <textarea name="description" class="mt-3 w-full textarea textarea-bordered min-h-32" placeholder="Description" required></textarea>
   <textarea name="first_message" class="mt-3 w-full textarea textarea-bordered min-h-32" placeholder="First Message" required></textarea>

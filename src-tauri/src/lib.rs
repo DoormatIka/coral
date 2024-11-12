@@ -249,6 +249,23 @@ async fn add_conversation(
     Ok(id)
 }
 
+#[tauri::command]
+fn delete_conversation(state: State<'_, Mutex<AppState>>, id: String) -> Result<(), String> {
+    let state = state.blocking_lock();
+    let transaction = state.db.rw_transaction().map_err(|err| err.to_string())?;
+    let character: CharacterConversation = transaction
+        .get()
+        .primary(id)
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| String::from(""))?;
+    transaction
+        .remove(character)
+        .map_err(|err| err.to_string())?;
+    transaction.commit().map_err(|err| err.to_string())?;
+
+    Ok(())
+}
+
 /////////////// CHARACTER //////////////////////
 
 #[tauri::command]
@@ -260,10 +277,7 @@ fn add_character(
     system_message: String,
 ) -> Result<(), String> {
     let state = state.blocking_lock();
-    let transaction = state
-        .db
-        .rw_transaction()
-        .map_err(|err| err.to_string())?;
+    let transaction = state.db.rw_transaction().map_err(|err| err.to_string())?;
     transaction
         .insert(Character {
             id: Uuid::new_v4().to_string(),
@@ -347,10 +361,7 @@ fn update_character(
 #[tauri::command]
 fn delete_character(state: State<'_, Mutex<AppState>>, id: String) -> Result<(), String> {
     let state = state.blocking_lock();
-    let transaction = state
-        .db
-        .rw_transaction()
-        .map_err(|err| err.to_string())?;
+    let transaction = state.db.rw_transaction().map_err(|err| err.to_string())?;
     let character: Character = transaction
         .get()
         .primary(id)
@@ -396,10 +407,7 @@ fn change_settings(
         mirostat_eta,
     };
     let state = state.blocking_lock();
-    let transaction = state
-        .db
-        .rw_transaction()
-        .map_err(|err| err.to_string())?;
+    let transaction = state.db.rw_transaction().map_err(|err| err.to_string())?;
     transaction
         .upsert(settings)
         .map_err(|err| err.to_string())?;
@@ -412,19 +420,15 @@ fn get_maybe_settings(transaction: &RwTransaction<'_>) -> Settings {
     let settings: Option<Settings> = transaction
         .get()
         .primary(String::from("123"))
-        .unwrap_or_else(|err| {
-            match err {
-                native_db::db_type::Error::ModelError(_) => {
-                    let mut settings = Settings::default();
-                    settings.id = String::from("123");
-                    transaction.insert(settings.clone()).unwrap();
+        .unwrap_or_else(|err| match err {
+            native_db::db_type::Error::ModelError(_) => {
+                let mut settings = Settings::default();
+                settings.id = String::from("123");
+                transaction.insert(settings.clone()).unwrap();
 
-                    Some(settings)
-                }
-                _ => {
-                    None
-                },
+                Some(settings)
             }
+            _ => None,
         });
     let settings = match settings {
         Some(settings) => settings,
@@ -443,10 +447,7 @@ fn get_maybe_settings(transaction: &RwTransaction<'_>) -> Settings {
 #[tauri::command]
 fn grab_settings(state: State<'_, Mutex<AppState>>) -> Result<Settings, String> {
     let state = state.blocking_lock();
-    let transaction = state
-        .db
-        .rw_transaction()
-        .map_err(|err| err.to_string())?;
+    let transaction = state.db.rw_transaction().map_err(|err| err.to_string())?;
     let settings = get_maybe_settings(&transaction);
     transaction.commit().map_err(|err| err.to_string()).unwrap();
 
@@ -477,10 +478,7 @@ async fn create_ai_message(
     conversation: MessagePayload,
 ) -> Result<String, String> {
     let state = state.lock().await;
-    let transaction = state
-        .db
-        .rw_transaction()
-        .map_err(|err| err.to_string())?;
+    let transaction = state.db.rw_transaction().map_err(|err| err.to_string())?;
 
     let settings = get_maybe_settings(&transaction);
     transaction.commit().map_err(|err| err.to_string())?;
@@ -509,10 +507,7 @@ async fn create_ai_message(
 #[tauri::command]
 fn clear_all(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
     let state = state.blocking_lock();
-    let transaction = state
-        .db
-        .rw_transaction()
-        .map_err(|err| err.to_string())?;
+    let transaction = state.db.rw_transaction().map_err(|err| err.to_string())?;
 
     let all: Vec<Character> = transaction
         .scan()
@@ -548,13 +543,21 @@ fn read_or_create_file(path: &str) -> std::io::Result<()> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
-            let dir = app.path().app_local_data_dir().expect("couldn't resolve app data dir").join("data");
+            let dir = app
+                .path()
+                .app_local_data_dir()
+                .expect("couldn't resolve app data dir")
+                .join("data");
 
             read_or_create_file(dir.to_str().unwrap()).unwrap();
             let db = Builder::new().create(&MODELS, dir).unwrap();
-            let appstate = AppState { db, http_client: Client::new() };
+            let appstate = AppState {
+                db,
+                http_client: Client::new(),
+            };
 
             app.manage(Mutex::new(appstate));
 
@@ -569,6 +572,7 @@ pub fn run() {
             grab_settings,
             // conversations
             add_conversation,
+            delete_conversation,
             grab_conversation,
             grab_conversation_list,
             update_conversation_log,
