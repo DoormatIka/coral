@@ -1,12 +1,15 @@
 
 <script lang="ts">
-  import {convertFileSrc} from "@tauri-apps/api/core";
   import {open} from "@tauri-apps/plugin-dialog";
   import {goto} from "$app/navigation";
   import {invoke} from "@tauri-apps/api/core";
+  import {readFile} from '@tauri-apps/plugin-fs';
+  import {base} from '$app/paths'
 
+  const image_link = `${base}/no_image.png`;
   let selected_image: string | null = null;
   let err: string = "";
+
   function showErrorModal() {
     (document.getElementById("errormodal")! as any).showModal();
   }
@@ -20,8 +23,18 @@
       }],
     });
     if (!file) { return; }
-    selected_image = convertFileSrc(file);
-    console.log(selected_image);
+    
+    const filePath = file as string;
+
+    const selected_image_buffer = await readFile(filePath);
+
+    // Convert binary buffer to data URL
+    const blob = new Blob([selected_image_buffer]);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      selected_image = event.target?.result as string;
+    };
+    reader.readAsDataURL(blob);
   }
 
   async function addCharacterToDatabase(event: Event) {
@@ -35,11 +48,13 @@
     const description = data.get("description");
 
     try {
+      // Add Character to Database
       await invoke("add_character", { // first_message (in rust) = firstMessage (in JS) :(
         name: name,
         description: description,
         firstMessage: first_message,
         systemMessage: system_message,
+        imageBuffer: selected_image ?? image_link,
       });
       await goto("/");
     } catch (inerr) {
@@ -68,7 +83,7 @@
   <div class="flex flex-col justify-center items-center gap-2 join join-vertical">
     <div class="avatar join-item">
       <div class="w-32 join-item">
-        <img src={selected_image ?? "https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp"} alt="nagakuuu" />
+        <img src={selected_image ?? image_link} alt="nagakuuu" />
       </div>
     </div>
     <button type="button" onclick={openDialog} class="btn-outline btn rounded w-32 join-item">Select Avatar</button>

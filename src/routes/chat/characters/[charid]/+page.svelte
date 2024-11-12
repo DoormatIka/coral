@@ -4,7 +4,6 @@
   import type { CharacterConversation } from "../../../types";
   import {invoke} from '@tauri-apps/api/core';
   import {page} from '$app/stores';
-  import { base } from '$app/paths'
 
   const charid = $page.params["charid"];
 
@@ -35,6 +34,7 @@
       })
       .catch((err) => error = err);
   }
+
 </script>
 
 <br class="py-10 h-full">
@@ -44,7 +44,7 @@
     <div class="flex justify-center items-center">
       <div class="avatar">
         <div class="sm:w-20 w-14 rounded-full">
-          <img src="{base}/no_image.png" alt="avatar" />
+          <img src={data.character.image} alt="avatar" />
         </div>
       </div>
       <h2 class="sm:text-4xl pl-5 text-2xl">{name}</h2>

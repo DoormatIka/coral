@@ -6,6 +6,7 @@ export type Character = {
 		system_message: string,
 		first_message: string,
 		conversations: string[],
+    image: string,
 }
 
 export type Message = { person: "system" | "user" | "assistant", content: string };

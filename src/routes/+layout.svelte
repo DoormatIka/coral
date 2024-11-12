@@ -10,6 +10,43 @@
   ];
 </script>
 
+<style>
+  .scroll-text {
+    -moz-transform: translateX(100%);
+    -webkit-transform: translateX(100%);
+    transform: translateX(100%);
+    width: 100%;
+    
+    -moz-animation: scrolling 10s linear infinite;
+    -webkit-animation: scrolling 10s linear infinite;
+    animation: scrolling 10s linear infinite;
+  }
+
+  /* for Firefox */
+  @-moz-keyframes scrolling {
+    from { -moz-transform: translateX(100%); }
+    to { -moz-transform: translateX(-150%); }
+  }
+
+  /* for Chrome */
+  @-webkit-keyframes scrolling {
+    from { -webkit-transform: translateX(100%); }
+    to { -webkit-transform: translateX(-150%); }
+  }
+
+  @keyframes scrolling {
+    from {
+      -moz-transform: translateX(100%);
+      -webkit-transform: translateX(100%);
+      transform: translateX(100%);
+    }
+    to {
+      -moz-transform: translateX(-150%);
+      -webkit-transform: translateX(-150%);
+      transform: translateX(-150%);
+    }
+  }
+</style>
 
 <main>
   <div class="drawer sm:drawer-open w-screen">
@@ -27,6 +64,10 @@
           <a href="/" class="flex items-center px-3" aria-label="Home">
             <iconify-icon icon="weui:back-filled" class="text-3xl py-3" style="vertical-align: -0.125em;"></iconify-icon>
           </a>
+        {:else}
+          <div class="p-3 overflow-hidden w-full">
+            <p class="text-nowrap scroll-text">Always check "Settings" to see if you're connected!</p>
+          </div>
         {/if}
       </div>
       <!-- Page content here -->

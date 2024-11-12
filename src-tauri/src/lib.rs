@@ -46,8 +46,10 @@ struct Character {
     description: String,
     system_message: String,
     first_message: String,
-    conversations: Vec<String>, // use IDs instead.
+    conversations: Vec<String>, // IDs
+    image: String, // IDs
 }
+
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[native_model(id = 2, version = 1)]
@@ -79,6 +81,7 @@ struct Settings {
     mirostat_tau: f32,
     mirostat_eta: f32,
 }
+
 impl Default for Settings {
     fn default() -> Self {
         Settings {
@@ -124,6 +127,7 @@ static MODELS: Lazy<Models> = Lazy::new(|| {
 });
 
 // everything returned from commands must implement serde::Serialize
+
 
 ///////////////////// CONVERSATION ///////////////////////
 
@@ -275,6 +279,7 @@ fn add_character(
     description: String,
     first_message: String,
     system_message: String,
+    image_buffer: String,
 ) -> Result<(), String> {
     let state = state.blocking_lock();
     let transaction = state.db.rw_transaction().map_err(|err| err.to_string())?;
@@ -286,6 +291,7 @@ fn add_character(
             system_message,
             first_message,
             conversations: Vec::new(),
+            image: image_buffer,
         })
         .map_err(|err| err.to_string())?;
 
@@ -332,6 +338,7 @@ fn update_character(
     system_message: Option<String>,
     first_message: Option<String>,
     conversations: Option<Vec<String>>,
+    image: Option<String>,
 ) -> Result<(), String> {
     let state = state.blocking_lock();
     let transaction = state.db.rw_transaction().unwrap();
@@ -350,6 +357,7 @@ fn update_character(
                 system_message: system_message.unwrap_or(char.system_message),
                 first_message: first_message.unwrap_or(char.first_message),
                 conversations: conversations.unwrap_or(char.conversations),
+                image: image.unwrap_or(char.image),
             },
         )
         .map_err(|err| err.to_string())?;
